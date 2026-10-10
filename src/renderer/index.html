@@ -1,0 +1,665 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FrameLine</title>
+    <link rel="stylesheet" href="../../node_modules/@fontsource/material-symbols-rounded/400.css">
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand"><span>FRAMELINE</span></div>
+      <span class="toolbar-divider" aria-hidden="true"></span>
+      <div class="top-actions">
+        <button id="new-project"><span class="material-icon" aria-hidden="true">note_add</span> New</button>
+        <button id="open-project"><span class="material-icon" aria-hidden="true">folder_open</span> Open</button>
+        <input class="project-title" id="project-name" type="text" value="Untitled project" maxlength="120" aria-label="Project title" data-tooltip="Edit the project title; Enter to apply, Escape to cancel" spellcheck="false">
+        <button id="save-project" class="primary-button"><span class="material-icon" aria-hidden="true">save</span> Save</button>
+        <span class="toolbar-divider" aria-hidden="true"></span>
+        <button id="undo" data-tooltip="Undo (Ctrl+Z)" disabled><span class="material-icon" aria-hidden="true">undo</span> Undo</button>
+        <button id="redo" data-tooltip="Redo (Ctrl+Y)" disabled><span class="material-icon" aria-hidden="true">redo</span> Redo</button>
+      </div>
+      <div class="window-controls">
+        <button id="window-minimize" class="window-control" data-tooltip="Minimize" aria-label="Minimize"><span class="material-icon" aria-hidden="true">minimize</span></button>
+        <button id="window-maximize" class="window-control" data-tooltip="Maximize" aria-label="Maximize"><span class="material-icon" aria-hidden="true">fullscreen</span></button>
+        <button id="window-close" class="window-control close-control" data-tooltip="Close" aria-label="Close"><span class="material-icon" aria-hidden="true">close</span></button>
+      </div>
+    </header>
+
+    <main>
+      <section class="workspace">
+        <aside class="image-panel panel">
+          <div class="panel-heading">
+            <div><h1>Import</h1><span id="image-count">0 images</span></div>
+            <div class="panel-heading-actions">
+              <button id="clear-images" class="icon-button" aria-label="Clear imported images" data-tooltip="Remove all imported images and their timeline clips" hidden><span class="material-icon" aria-hidden="true">delete_sweep</span></button>
+              <button id="rename-images" class="icon-button" type="button" aria-label="Rename images" data-tooltip="Rename images with a numbered sequence or pattern" hidden><span class="material-icon" aria-hidden="true">drive_file_rename_outline</span></button>
+              <button id="import-images" class="icon-button" aria-label="Add images" data-tooltip="Import images or video, or create empty images"><span class="material-icon" aria-hidden="true">add</span></button>
+            </div>
+          </div>
+          <div id="image-list" class="image-list" role="listbox" aria-label="Imported images" aria-multiselectable="true" tabindex="0"></div>
+          <div id="empty-list" class="empty-state">
+            <div class="empty-icon material-icon" aria-hidden="true">perm_media</div>
+            <strong>Build your sequence</strong>
+            <span>Import images or video, or create empty images to draw on.</span>
+            <button id="empty-import" class="secondary-button">Add Images</button>
+          </div>
+          <div class="panel-footer">Drag to reorder · Video imports as frames</div>
+        </aside>
+        <div id="image-panel-resizer" class="panel-resizer" role="separator" aria-label="Resize image panel" aria-orientation="vertical" aria-valuemin="135" aria-valuemax="420" tabindex="0" data-tooltip="Drag to resize image panel"></div>
+
+        <section class="preview-panel">
+          <div class="preview-toolbar">
+            <span>PREVIEW</span>
+            <div class="preview-tools">
+              <span id="preview-resolution">NO IMAGE</span>
+              <div id="preview-background-control" class="preview-background-control">
+                <button id="preview-background-toggle" class="preview-grid-toggle" type="button" aria-label="Preview background" aria-expanded="false" aria-controls="preview-background-popover" data-tooltip="Preview background"><span class="material-icon" aria-hidden="true">format_color_fill</span></button>
+                <div id="preview-background-popover" class="preview-grid-popover preview-background-popover" role="group" aria-label="Preview background" hidden>
+                  <strong>Preview background</strong>
+                  <label class="preview-background-color" for="preview-background-color">Color
+                    <input id="preview-background-color" type="color" value="#ffffff">
+                    <output id="preview-background-color-value">#ffffff</output>
+                  </label>
+                  <label class="preview-background-transparent"><input id="preview-background-transparent" type="checkbox" checked> Transparent</label>
+                </div>
+              </div>
+              <div id="preview-grid-control" class="preview-grid-control">
+                <button id="preview-grid-toggle" class="preview-grid-toggle" type="button" aria-label="Grid settings" aria-haspopup="true" aria-expanded="false" aria-controls="preview-grid-popover" data-tooltip="Grid settings"><span class="material-icon" aria-hidden="true">grid_on</span></button>
+                <div id="preview-grid-popover" class="preview-grid-popover" role="group" aria-label="Grid settings" hidden>
+                  <label class="preview-grid-visible"><input id="preview-grid-visible" type="checkbox"> Show grid</label>
+                  <label class="preview-grid-size" for="preview-grid-size">Cell size
+                    <span><input id="preview-grid-size" type="number" min="1" max="256" step="1" value="20" aria-label="Grid cell size in image pixels" data-tooltip="Grid cell size in image pixels"> px</span>
+                  </label>
+                  <label class="preview-grid-opacity" for="preview-grid-opacity">Opacity
+                    <input id="preview-grid-opacity" type="range" min="0" max="100" step="1" value="50" aria-label="Grid line opacity">
+                    <output id="preview-grid-opacity-value">50%</output>
+                  </label>
+                </div>
+              </div>
+              <div class="preview-zoom" aria-label="Preview zoom controls">
+                <button id="preview-zoom-out" data-tooltip="Zoom out" aria-label="Zoom out"><span class="material-icon">remove</span></button>
+                <button id="preview-zoom-fit" data-tooltip="Fit image in preview" aria-label="Fit image in preview">FIT</button>
+                <button id="preview-zoom-in" data-tooltip="Zoom in" aria-label="Zoom in"><span class="material-icon">add</span></button>
+                <strong id="preview-zoom-label">100%</strong>
+              </div>
+            </div>
+          </div>
+          <div class="preview-workspace">
+            <aside class="preview-toolbox" aria-label="Preview tools">
+              <div class="tool-divider" role="separator"></div>
+              <div class="preview-tool-group" data-tool-group="magic" role="group" aria-label="Magic tools"></div>
+              <div class="tool-divider" role="separator"></div>
+              <div class="preview-tool-group" data-tool-group="features" role="group" aria-label="Enable features"></div>
+              <div class="tool-divider" role="separator"></div>
+              <div class="preview-tool-group" data-tool-group="basic" role="group" aria-label="Basic tools"></div>
+            </aside>
+            <aside class="preview-options-panel" aria-label="Selected preview tool options">
+              <div class="preview-options-heading"><strong>PREVIEW</strong><div class="preview-tool-activation"><span id="preview-tool-name">HAND</span><label id="preview-feature-enable" for="preview-tool-enabled" hidden><input id="preview-tool-enabled" type="checkbox"> Enable</label></div></div>
+              <div id="preview-hand-options" class="preview-options-content">Right-drag or use the Hand tool to move the image.</div>
+              <div id="preview-crop-controls" class="crop-controls" hidden>
+                <div class="preview-options-content">Drag a side or corner handle, then apply the crop to this image or all images.</div>
+                <div class="crop-dimensions" id="preview-crop-dimensions">Image size: —</div>
+                <div class="crop-fields">
+                  <label for="preview-crop-x">X (px)<input id="preview-crop-x" data-crop-field="x" type="number" min="0" step="1" disabled></label>
+                  <label for="preview-crop-y">Y (px)<input id="preview-crop-y" data-crop-field="y" type="number" min="0" step="1" disabled></label>
+                  <label for="preview-crop-width">Width (px)<input id="preview-crop-width" data-crop-field="width" type="number" min="1" step="1" disabled></label>
+                  <label for="preview-crop-height">Height (px)<input id="preview-crop-height" data-crop-field="height" type="number" min="1" step="1" disabled></label>
+                </div>
+                <label class="field-label" for="preview-crop-scope">Apply to:</label>
+                <select id="preview-crop-scope">
+                  <option value="current">This image</option>
+                  <option value="all">All images</option>
+                </select>
+                <div class="tool-actions">
+                  <button id="preview-crop-apply" class="primary-button secondary-button" type="button" disabled>Apply Crop</button>
+                  <button id="preview-crop-reset" class="secondary-button" type="button" disabled>Reset Crop</button>
+                </div>
+              </div>
+              <div id="preview-outline-controls" class="outline-controls" hidden>
+                <div class="preview-options-content">Changes update live while adjusting.</div>
+                <div class="tool-option">
+                  <label for="preview-outline-color">Color</label>
+                  <input id="preview-outline-color" type="color" value="#ffffff" aria-label="Outline color">
+                </div>
+                <div class="tool-option">
+                  <label for="preview-outline-size">Size <output id="preview-outline-size-value">8 px</output></label>
+                  <input id="preview-outline-size" type="range" min="1" max="100" value="8" aria-label="Outline size">
+                </div>
+                <div class="tool-option">
+                  <label for="preview-outline-position">Position</label>
+                  <select id="preview-outline-position">
+                    <option value="inside">Inside</option>
+                    <option value="center" selected>Center</option>
+                    <option value="outside">Outside</option>
+                  </select>
+                </div>
+                <div class="tool-option">
+                  <label for="preview-outline-softness">Edge softness <output id="preview-outline-softness-value">0 px</output></label>
+                  <input id="preview-outline-softness" type="range" min="0" max="20" value="0" aria-label="Outline edge softness">
+                </div>
+                <div class="tool-option">
+                  <label for="preview-outline-opacity">Opacity <output id="preview-outline-opacity-value">100%</output></label>
+                  <input id="preview-outline-opacity" type="range" min="1" max="100" value="100" aria-label="Outline opacity">
+                </div>
+                <div class="tool-option">
+                  <label for="preview-outline-scope">Apply to</label>
+                  <select id="preview-outline-scope">
+                    <option value="current">This image</option>
+                    <option value="all">All images</option>
+                  </select>
+                </div>
+                <button id="preview-outline-apply" class="primary-button secondary-button" type="button">Apply outline</button>
+                <button id="preview-outline-reset" class="secondary-button" type="button">Remove outline</button>
+                <p id="preview-outline-status" class="preview-options-content" role="status" aria-live="polite">Enable to preview. Apply commits changes.</p>
+                <progress id="preview-outline-progress" class="tool-processing-progress" aria-label="Outline processing" hidden></progress>
+              </div>
+              <div id="preview-padding-controls" class="crop-controls" hidden>
+                <div class="preview-options-content">Add transparent space around the current image. Values are in pixels.</div>
+                <label class="tool-checkbox padding-lock"><input id="preview-padding-lock" type="checkbox" checked> Lock all sides</label>
+                <div class="crop-fields padding-fields">
+                  <label for="preview-padding-top">Top (px)<input id="preview-padding-top" data-padding-field="top" type="number" min="0" max="4096" step="1" value="16"></label>
+                  <label for="preview-padding-bottom">Bottom (px)<input id="preview-padding-bottom" data-padding-field="bottom" type="number" min="0" max="4096" step="1" value="16"></label>
+                  <label for="preview-padding-left">Left (px)<input id="preview-padding-left" data-padding-field="left" type="number" min="0" max="4096" step="1" value="16"></label>
+                  <label for="preview-padding-right">Right (px)<input id="preview-padding-right" data-padding-field="right" type="number" min="0" max="4096" step="1" value="16"></label>
+                </div>
+                <label class="field-label" for="preview-padding-scope">Apply to:</label>
+                <select id="preview-padding-scope"><option value="current">This image</option><option value="all">All images</option></select>
+                <button id="preview-padding-apply" class="primary-button secondary-button" type="button">Apply Padding</button>
+                <progress id="preview-padding-progress" class="tool-processing-progress" aria-label="Preparing padding preview" hidden></progress>
+              </div>
+              <div id="preview-brush-controls" class="brush-controls" hidden>
+                <div id="preview-healing-controls" hidden>
+                  <p class="preview-options-content">Paint over mixed edge colors to recover transparency.</p>
+                  <label class="tool-checkbox"><input id="preview-healing-auto-keep" type="checkbox"> Auto Keep nearby colors (hair)</label>
+                  <div id="preview-healing-hair-controls" hidden>
+                    <div class="tool-option">
+                      <label for="preview-healing-sample-distance">Sample distance <output id="preview-healing-sample-distance-value">24 px</output></label>
+                      <input id="preview-healing-sample-distance" type="range" min="1" max="128" value="24" aria-label="Color Cleanup foreground sample distance">
+                    </div>
+                    <label class="tool-checkbox"><input id="preview-healing-recover-transparency" type="checkbox" checked> Recover strand transparency</label>
+                    <p class="preview-options-content">Samples nearby clean hair colors, including highlights and shadows. Increase distance for wide fringes. Turn off transparency recovery to keep existing opacity. Uncertain pixels stay unchanged.</p>
+                  </div>
+                  <div class="tool-option">
+                    <label for="preview-healing-keep">Keep color</label>
+                    <input id="preview-healing-keep" type="color" value="#000000" aria-label="Color Cleanup Keep color">
+                  </div>
+                  <div class="tool-option">
+                    <label for="preview-healing-remove">Remove color</label>
+                    <input id="preview-healing-remove" type="color" value="#04f404" aria-label="Color Cleanup Remove color">
+                  </div>
+                  <label class="tool-checkbox"><input id="preview-healing-auto" type="checkbox"> Auto detect Remove color</label>
+                  <div id="preview-healing-auto-controls" hidden>
+                    <p id="preview-healing-auto-status" class="preview-options-content" role="status" aria-live="polite">Click the image to detect Remove color inside the brush area.</p>
+                  </div>
+                  <div class="tool-option">
+                    <label for="preview-healing-tolerance">Color tolerance <output id="preview-healing-tolerance-value">24</output></label>
+                    <input id="preview-healing-tolerance" type="range" min="0" max="255" value="24" aria-label="Color Cleanup mixture tolerance">
+                  </div>
+                  <div class="tool-option">
+                    <label for="preview-healing-strength">Strength <output id="preview-healing-strength-value">100%</output></label>
+                    <input id="preview-healing-strength" type="range" min="1" max="100" value="100" aria-label="Color Cleanup strength">
+                  </div>
+                  <p id="preview-healing-error" class="modal-error" role="alert" hidden>Keep color and Remove color must be different.</p>
+                  <details class="preview-options-content"><summary>How color cleanup works</summary><p>Manual Keep uses one foreground color. Auto Keep uses nearby clean colors and changes only pixels matching a mixture with Remove color. Samples follow visible pixels and stop at transparent gaps. Feather and strength blend the correction at the brush edge.</p></details>
+                </div>
+                <div id="preview-brush-color-field" class="tool-option">
+                  <label for="preview-brush-color">Color</label>
+                  <input id="preview-brush-color" type="color" value="#ff3030" aria-label="Selected brush color">
+                </div>
+                <div id="preview-brush-opacity-field" class="tool-option">
+                  <label for="preview-brush-opacity">Opacity <output id="preview-brush-opacity-value">100%</output></label>
+                  <input id="preview-brush-opacity" type="range" min="1" max="100" value="100" aria-label="Brush opacity">
+                </div>
+                <div class="tool-option">
+                  <label for="preview-brush-size" data-tooltip="Enter a size in pixels, or hold Alt and scroll in Preview to resize">
+                    Size <span class="brush-size-value"><input id="preview-brush-size" type="number" min="1" step="any" value="12" aria-label="Brush size in pixels"><span>px</span></span>
+                  </label>
+                  <input id="preview-brush-size-slider" type="range" min="1" max="512" value="12" aria-label="Brush size slider">
+                </div>
+                <div class="tool-option">
+                  <label for="preview-brush-feather">Feather <output id="preview-brush-feather-value">0%</output></label>
+                  <input id="preview-brush-feather" type="range" min="0" max="100" value="0" aria-label="Brush feather">
+                </div>
+                <label class="tool-checkbox" data-tooltip="Smooths edge pixels without adding feather. Turn off with Feather 0 for crisp pixel art."><input id="preview-brush-antialias" type="checkbox" checked> Anti-aliasing</label>
+                <label id="preview-square-brush-option" class="tool-checkbox"><input id="preview-square-brush" type="checkbox"> Square brush</label>
+                <div class="tool-actions">
+                  <button id="preview-paint-apply" class="primary-button secondary-button" type="button" disabled>Apply Changes</button>
+                  <button id="preview-paint-discard" class="secondary-button" type="button" disabled>Discard Changes</button>
+                </div>
+              </div>
+            </aside>
+            <div class="preview-stage" id="preview-stage" tabindex="0" aria-label="Image preview">
+              <div class="preview-placeholder"><div class="placeholder-glyph material-icon" aria-hidden="true">image</div><span>Import images to begin</span></div>
+              <div id="preview-image-wrap" class="preview-image-wrap" hidden>
+                <img id="preview-image" alt="Current frame preview" draggable="false">
+                <canvas id="preview-paint-canvas" aria-hidden="true"></canvas>
+                <canvas id="preview-padding-canvas" aria-hidden="true" hidden></canvas>
+                <canvas id="preview-refine-canvas" aria-hidden="true" hidden></canvas>
+                <canvas id="preview-outline-canvas" aria-hidden="true" hidden></canvas>
+                <div id="preview-crop-overlay" class="preview-crop-overlay" hidden>
+                  <div class="crop-frame">
+                    <span class="crop-handle north" data-crop-handle="n"></span>
+                    <span class="crop-handle east" data-crop-handle="e"></span>
+                    <span class="crop-handle south" data-crop-handle="s"></span>
+                    <span class="crop-handle west" data-crop-handle="w"></span>
+                    <span class="crop-handle northwest" data-crop-handle="nw"></span>
+                    <span class="crop-handle northeast" data-crop-handle="ne"></span>
+                    <span class="crop-handle southwest" data-crop-handle="sw"></span>
+                    <span class="crop-handle southeast" data-crop-handle="se"></span>
+                  </div>
+                </div>
+              </div>
+              <canvas id="preview-pixel-grid" class="preview-pixel-grid" aria-hidden="true" hidden></canvas>
+              <div id="preview-brush-cursor" class="preview-brush-cursor" aria-hidden="true" hidden></div>
+            </div>
+          </div>
+          <div class="transport-bar">
+            <button id="first-frame" class="transport-button" data-tooltip="First frame (Home)" aria-label="First frame"><span class="material-icon">first_page</span></button>
+            <button id="previous-image" class="transport-button" data-tooltip="Previous image (Shift+Left)" aria-label="Previous image"><span class="material-icon">skip_previous</span></button>
+            <button id="previous-frame" class="transport-button" data-tooltip="Previous frame (Left)" aria-label="Previous frame"><span class="material-icon">chevron_left</span></button>
+            <button id="play" class="play-button" data-tooltip="Play or pause (Space)" aria-label="Play"><span class="material-icon">play_arrow</span></button>
+            <button id="next-frame" class="transport-button" data-tooltip="Next frame (Right)" aria-label="Next frame"><span class="material-icon">chevron_right</span></button>
+            <button id="next-image" class="transport-button" data-tooltip="Next image (Shift+Right)" aria-label="Next image"><span class="material-icon">skip_next</span></button>
+            <button id="last-frame" class="transport-button" data-tooltip="Last frame (End)" aria-label="Last frame"><span class="material-icon">last_page</span></button>
+          </div>
+        </section>
+        <div id="properties-panel-resizer" class="panel-resizer" role="separator" aria-label="Resize settings panel" aria-orientation="vertical" aria-valuemin="160" aria-valuemax="360" tabindex="0" data-tooltip="Drag to resize settings panel"></div>
+
+        <aside class="properties-panel panel">
+          <div class="panel-heading"><div><h1>Settings</h1></div></div>
+          <div class="properties-content">
+            <div class="section-label">TIMELINE SELECTION</div>
+            <div id="selection-empty" class="selection-empty">Select a clip on the frame line to edit its timing.</div>
+            <div id="clip-properties" hidden>
+              <div id="clip-name" class="clip-name"></div>
+              <p id="selection-timing-hint" class="selection-timing-hint" hidden>Duration changes apply to every selected clip.</p>
+              <div class="clip-stat"><span>Start</span><strong id="clip-start">Frame 1</strong></div>
+              <div class="clip-stat"><span>End</span><strong id="clip-end">Frame 24</strong></div>
+              <label class="field-label" for="clip-frames">Frames <span>whole frames only</span></label>
+              <input id="clip-frames" type="number" min="1" step="1">
+              <label class="field-label" for="clip-seconds">Duration <span>seconds</span></label>
+              <input id="clip-seconds" type="number" min="0.001" step="0.01">
+            </div>
+            <div class="property-divider"></div>
+            <label class="field-label" for="fps-select">Frame rate <strong id="fps-display">24 FPS</strong></label>
+            <select id="fps-select">
+              <option value="12">12 FPS</option><option value="15">15 FPS</option>
+              <option value="24" selected>24 FPS</option><option value="25">25 FPS</option>
+              <option value="30">30 FPS</option><option value="50">50 FPS</option>
+              <option value="60">60 FPS</option><option value="add">Add…</option>
+            </select>
+            <label class="field-label" for="default-duration">Default image duration <span>frames</span></label>
+            <input id="default-duration" type="number" min="1" step="1" value="24">
+            <label class="field-label" for="speed-select">Playback speed <strong id="speed-display">1.00×</strong></label>
+            <select id="speed-select">
+              <option value="0.1">0.10×</option><option value="0.25">0.25×</option>
+              <option value="0.5">0.50×</option><option value="0.75">0.75×</option>
+              <option value="1" selected>1.00×</option><option value="1.25">1.25×</option>
+              <option value="1.5">1.50×</option><option value="2">2.00×</option>
+              <option value="4">4.00×</option><option value="8">8.00×</option>
+              <option value="add">Add…</option>
+            </select>
+            <button id="loop-toggle" class="loop-toggle" aria-pressed="true"><span><span class="material-icon" aria-hidden="true">repeat</span> LOOP</span><strong>ON</strong></button>
+          </div>
+        </aside>
+      </section>
+
+      <div id="timeline-resizer" class="timeline-resizer" role="separator" aria-label="Resize frame line panel" aria-orientation="horizontal" aria-valuemin="160" aria-valuemax="600" tabindex="0" data-tooltip="Drag to resize frame line panel"></div>
+
+      <section class="timeline-panel panel">
+        <div class="timeline-heading">
+          <div class="timeline-title"><h2>Frame line</h2><span id="fps-badge">24 FPS</span></div>
+          <div class="timeline-controls">
+            <div class="frame-readout"><span>FRAME</span><strong id="frame-count">0 / 0</strong><span id="timecode">00:00.000</span></div>
+            <div class="zoom-control"><button id="zoom-out" aria-label="Zoom out"><span class="material-icon">remove</span></button><input id="zoom-slider" type="range" min="1" max="5000" step="0.1" value="100" aria-label="Timeline zoom"><button id="zoom-in" aria-label="Zoom in"><span class="material-icon">add</span></button><strong id="zoom-label">100%</strong></div>
+          </div>
+        </div>
+        <div id="timeline-scroll" class="timeline-scroll" tabindex="0" aria-label="Timeline">
+          <div id="timeline-content" class="timeline-content">
+            <div id="ruler" class="ruler"></div>
+            <div id="track" class="track">
+              <div id="clips" class="clips" role="listbox" aria-label="Timeline clips" aria-multiselectable="true"></div>
+              <div id="drop-indicator" class="insert-indicator"></div>
+              <div id="playhead" class="playhead"><div class="playhead-cap"></div></div>
+              <div id="loop-range" class="loop-range" aria-label="Playback loop range">
+                <div id="loop-range-band" class="loop-range-band" aria-hidden="true"></div>
+                <button id="loop-start" class="loop-handle loop-start" type="button" role="slider" aria-label="Loop Start" aria-orientation="horizontal" data-tooltip="Drag to set Loop Start; arrow keys adjust one frame"><span class="loop-grip" aria-hidden="true">⏵</span><span id="loop-start-label">Start</span></button>
+                <button id="loop-end" class="loop-handle loop-end" type="button" role="slider" aria-label="Loop End" aria-orientation="horizontal" data-tooltip="Drag to set Loop End; arrow keys adjust one frame"><span id="loop-end-label">End</span><span class="loop-grip" aria-hidden="true">⏴</span></button>
+                <span id="loop-range-empty" class="loop-range-empty">Import images to choose a loop range</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <footer class="timeline-footer">
+          <div class="project-stats"><span>IMAGES <strong id="stats-images">0</strong></span><span>FRAMES <strong id="stats-frames">0</strong></span><span>FPS <strong id="stats-fps">24</strong></span><span>DURATION <strong id="stats-duration">00:00.00</strong></span><span>SPEED <strong id="stats-speed">1.00×</strong></span><span id="stats-loop">LOOP ON</span></div>
+          <div class="export-controls">
+            <select id="export-scope" aria-label="Export scope" data-tooltip="Choose which timeline frames to export">
+              <option value="all">All frames</option>
+              <option value="range">Start–End range</option>
+              <option value="selected">Selected clips</option>
+            </select>
+            <select id="export-format" aria-label="Export format">
+              <option value="gif">GIF animation</option>
+              <option value="mp4">MP4 video</option>
+              <option value="mov">MOV video</option>
+              <option value="webm">WebM video</option>
+              <option value="avi">AVI video</option>
+              <option value="mkv">MKV video</option>
+              <option value="sources">Source images</option>
+              <option value="frames">PNG frame sequence</option>
+              <option value="sheet-clips">Contact sheet · clips</option>
+              <option value="sheet-frames">Contact sheet · frames</option>
+            </select>
+            <button id="export-gif" class="export-button"><span class="material-icon" aria-hidden="true">file_upload</span> Export</button>
+          </div>
+        </footer>
+      </section>
+    </main>
+    <dialog id="rename-images-dialog" class="modal-dialog rename-dialog" aria-labelledby="rename-title">
+      <form id="rename-images-form" class="modal-content" novalidate>
+        <div class="modal-heading"><div><h2 id="rename-title">Rename images</h2><p>Preview names before renaming. Original files stay in place; source exports use these names.</p></div><button id="rename-close" class="modal-close" type="button" aria-label="Cancel"><span class="material-icon" aria-hidden="true">close</span></button></div>
+        <div class="rename-grid">
+          <label>Apply to<select id="rename-scope"><option value="all">All images</option><option value="selected">Selected images</option></select></label>
+          <label>Numbering order<select id="rename-order"><option value="import">Import list order</option><option value="reverse">Reverse list order</option><option value="name">Name A–Z (natural order)</option></select></label>
+          <label>Rename method<select id="rename-mode"><option value="sequence">Numbered sequence</option><option value="pattern">Custom pattern</option></select></label>
+          <label>Letter case<select id="rename-case"><option value="keep">Keep letter case</option><option value="lower">lowercase</option><option value="upper">UPPERCASE</option></select></label>
+        </div>
+        <div id="rename-sequence-fields" class="rename-grid rename-sequence-fields">
+          <label>Base name<input id="rename-base" type="text" value="Image" maxlength="255" placeholder="ImageName"></label>
+          <label>Separator<input id="rename-separator" type="text" value="" maxlength="30" placeholder="None, _ or -"></label>
+          <label>Suffix<input id="rename-suffix" type="text" value="" maxlength="100" placeholder="Optional, e.g. _run"></label>
+          <label class="rename-checkbox"><input id="rename-extension" type="checkbox" checked> Keep file extension</label>
+        </div>
+        <div id="rename-pattern-fields" hidden><label class="field-label" for="rename-pattern">Pattern</label><input id="rename-pattern" type="text" value="{name}_{number}{ext}" maxlength="255"><p class="rename-help"><code>{name}</code> current name without extension · <code>{number}</code> formatted number · <code>{index}</code> position starting at 1 · <code>{ext}</code> extension including its dot.<br>Example: <code>Run_{number}{ext}</code></p></div>
+        <div class="rename-grid rename-number-fields">
+          <label>Start number<input id="rename-start" type="number" min="0" step="1" value="1"></label>
+          <label>Increment<input id="rename-step" type="number" min="1" step="1" value="1"></label>
+          <label>Number format<input id="rename-padding" type="text" value="000" maxlength="12" placeholder="0, 00, 000…"><small>0 = 1 · 00 = 01 · 000 = 001</small></label>
+        </div>
+        <label class="rename-checkbox"><input id="rename-unique" type="checkbox" checked> Make names unique if a name is already used</label>
+        <div class="rename-preview-wrap"><table class="rename-preview"><thead><tr><th>Current name</th><th>New name</th></tr></thead><tbody id="rename-preview"></tbody></table></div>
+        <p id="rename-summary" class="rename-help" role="status" aria-live="polite"></p>
+        <div id="rename-error" class="modal-error" role="alert" hidden></div>
+        <div class="modal-actions"><button id="rename-cancel" class="secondary-button" type="button">Cancel</button><button id="rename-apply" class="primary-button" type="submit">Rename images</button></div>
+      </form>
+    </dialog>
+    <dialog id="create-image-dialog" class="modal-dialog" aria-labelledby="create-image-title" aria-describedby="create-image-description">
+      <form id="create-image-form" class="modal-content" novalidate>
+        <div class="modal-heading">
+          <div><h2 id="create-image-title"><span class="material-icon" aria-hidden="true">note_add</span> Create empty images</h2><p id="create-image-description"></p></div>
+          <button id="create-image-close" class="modal-close" type="button" aria-label="Cancel"><span class="material-icon" aria-hidden="true">close</span></button>
+        </div>
+        <div class="create-image-fields">
+          <label class="field-label" for="create-image-preset">Standard size</label>
+          <select id="create-image-preset"></select>
+          <div class="create-image-dimensions">
+            <label for="create-image-width">Width (px)<input id="create-image-width" type="number" min="1" max="8192" step="1" required></label>
+            <label for="create-image-height">Height (px)<input id="create-image-height" type="number" min="1" max="8192" step="1" required></label>
+          </div>
+          <label class="field-label" for="create-image-count">Number of images</label>
+          <input id="create-image-count" type="number" min="1" max="1000" step="1" value="1" required>
+          <label class="preview-background-color" for="create-image-color">Background
+            <input id="create-image-color" type="color" value="#ffffff">
+            <output id="create-image-color-value">#ffffff</output>
+          </label>
+          <label class="preview-background-transparent"><input id="create-image-transparent" type="checkbox" checked> Transparent</label>
+          <div id="create-image-corner-field" class="create-image-corner-field" hidden><span>Sampled corners</span><div id="create-image-corners" aria-label="Four corner colors"></div></div>
+        </div>
+        <div class="create-image-preview-area"><div id="create-image-preview" aria-label="Empty image background preview"></div><output id="create-image-size-value"></output></div>
+        <div id="create-image-error" class="modal-error" role="alert" hidden></div>
+        <div class="modal-actions">
+          <button id="create-image-cancel" class="secondary-button" type="button">Cancel</button>
+          <button id="create-image-start" class="primary-button" type="submit"><span class="material-icon" aria-hidden="true">add</span> Create images</button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="video-import-dialog" class="modal-dialog">
+      <form id="video-import-form" class="modal-content">
+        <div class="modal-heading">
+          <div>
+            <h2><span class="material-icon" aria-hidden="true">video_library</span> Import video frames</h2>
+            <p id="video-import-filename">Choose how to sample this video into your timeline.</p>
+          </div>
+          <button id="video-import-close" class="modal-close" type="button" aria-label="Close"><span class="material-icon">close</span></button>
+        </div>
+        <fieldset class="extraction-options">
+          <legend>Frame extraction method</legend>
+          <label class="extraction-option">
+            <input type="radio" name="video-import-mode" value="default" checked>
+            <span class="material-icon" aria-hidden="true">speed</span>
+            <span class="option-copy"><strong>Default</strong><small>Sample at the project frame rate (<span id="video-import-fps">24</span> FPS).</small></span>
+          </label>
+          <label class="extraction-option">
+            <input type="radio" name="video-import-mode" value="interval">
+            <span class="material-icon" aria-hidden="true">timer</span>
+            <span class="option-copy"><strong>Interval (s)</strong><small>Sample at each interval; every image gets the same nearest whole-frame duration.</small></span>
+            <input id="video-import-interval" class="option-input" type="text" inputmode="decimal" value="0.1" placeholder="0.1" aria-label="Interval in seconds" disabled>
+          </label>
+          <label class="extraction-option">
+            <input type="radio" name="video-import-mode" value="count">
+            <span class="material-icon" aria-hidden="true">photo_library</span>
+            <span class="option-copy"><strong>Image Count</strong><small>Divide the video into equal time slots and sample one image per slot.</small></span>
+            <input id="video-import-count" class="option-input" type="number" min="1" max="100000" step="1" value="16" aria-label="Image count" disabled>
+          </label>
+        </fieldset>
+        <div id="video-import-error" class="modal-error" role="alert" hidden></div>
+        <div class="modal-actions">
+          <button id="video-import-cancel" class="secondary-button" type="button">Cancel</button>
+          <button id="video-import-start" class="primary-button" type="submit"><span class="material-icon" aria-hidden="true">movie_creation</span> Import frames</button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="message-dialog" class="modal-dialog message-dialog" aria-labelledby="message-title" aria-describedby="message-text">
+      <div class="modal-content">
+        <div class="modal-heading">
+          <div><h2 id="message-title">FrameLine</h2><p id="message-text"></p></div>
+          <button id="message-close" class="modal-close" type="button" aria-label="Cancel"><span class="material-icon" aria-hidden="true">close</span></button>
+        </div>
+        <div id="message-scope-field" hidden>
+          <label class="field-label" for="message-scope">Apply to:</label>
+          <select id="message-scope">
+            <option value="current">This image</option>
+            <option value="all">All images</option>
+          </select>
+        </div>
+        <div id="message-actions" class="modal-actions"></div>
+      </div>
+    </dialog>
+    <dialog id="custom-number-dialog" class="modal-dialog">
+      <form id="custom-number-form" class="modal-content">
+        <div class="modal-heading">
+          <div><h2 id="custom-number-title">Custom value</h2></div>
+        </div>
+        <label id="custom-number-label" class="field-label" for="custom-number-input">Value</label>
+        <input id="custom-number-input" type="number" step="any" required>
+        <div id="custom-number-error" class="modal-error" role="alert" hidden></div>
+        <div class="modal-actions">
+          <button id="custom-number-cancel" class="secondary-button" type="button">Cancel</button>
+          <button class="primary-button" type="submit">Apply</button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="background-dialog" class="modal-dialog background-dialog">
+      <form id="background-form" class="modal-content">
+        <div class="modal-heading">
+          <div>
+            <h2><span class="material-icon" aria-hidden="true">auto_fix_high</span> Remove background</h2>
+          </div>
+          <button id="background-close" class="modal-close" type="button" aria-label="Close"><span class="material-icon">close</span></button>
+        </div>
+        <div class="background-workspace">
+        <section class="background-preview-panel" aria-label="Live removal preview">
+        <div class="background-preview-controls">
+          <strong>Live preview</strong>
+          <button id="background-ignore-brush" class="secondary-button" type="button" aria-pressed="false" data-tooltip="Paint areas to keep unchanged"><span class="material-icon" aria-hidden="true">brush</span> Ignore Brush</button>
+          <button id="background-preview-fit" class="secondary-button" type="button" data-tooltip="Fit preview">FIT</button>
+          <div id="background-preview-background-control" class="preview-background-control">
+            <button id="background-preview-background-toggle" class="preview-grid-toggle" type="button" aria-label="Preview background" aria-expanded="false" aria-controls="background-preview-background-popover" data-tooltip="Preview background"><span class="material-icon" aria-hidden="true">format_color_fill</span></button>
+            <div id="background-preview-background-popover" class="preview-grid-popover preview-background-popover" role="group" aria-label="Preview background" hidden>
+              <strong>Preview background</strong>
+              <label class="preview-background-color" for="background-preview-color">Color
+                <input id="background-preview-color" type="color" value="#ffffff">
+                <output id="background-preview-color-value">#ffffff</output>
+              </label>
+              <label class="preview-background-transparent"><input id="background-preview-transparent" type="checkbox" checked data-tooltip="Show transparency checkerboard"> Transparent</label>
+            </div>
+          </div>
+        </div>
+        <div id="background-ignore-controls" class="background-ignore-controls" hidden>
+          <label for="background-ignore-size">Size <input id="background-ignore-size" type="number" min="1" value="40" step="1" aria-label="Ignore brush size"> px</label>
+          <button id="background-ignore-undo" class="secondary-button" type="button" disabled>Undo mark</button>
+          <button id="background-ignore-clear" class="secondary-button" type="button" disabled>Clear marks</button>
+        </div>
+        <div id="background-preview-frame" class="background-preview-frame">
+          <img id="background-sample-image" alt="Background removal preview" draggable="false">
+          <canvas id="background-ignore-overlay" aria-hidden="true"></canvas>
+          <div id="background-ignore-cursor" hidden></div>
+          <span id="background-sample-hint">Select “Sample a color” and click the background in the image to pick its color.</span>
+        </div>
+        <p class="background-preview-help">Scroll to zoom · Right-drag to pan</p>
+        <div id="background-preview-status" class="background-preview-status" aria-busy="false">
+          <p id="background-preview-status-text" role="status" aria-live="polite">Preview only — changes are not applied.</p>
+          <progress id="background-preview-progress" aria-label="Updating background removal preview" hidden></progress>
+        </div>
+        </section>
+        <aside class="background-settings" aria-label="Background removal settings">
+          <fieldset class="background-section">
+          <legend>Background</legend>
+          <label class="field-label" for="background-method">Removal method</label>
+          <select id="background-method">
+            <option value="auto">Auto Background</option>
+            <option value="chroma">Chroma key</option>
+            <option value="sample">Sample a color from the image</option>
+          </select>
+          <div id="background-auto-settings">
+            <label class="field-label" for="background-source">Background color</label>
+            <select id="background-source">
+              <option value="auto">Detect automatically</option>
+              <option value="custom">Choose a custom color</option>
+            </select>
+            <p id="background-detected-colors" class="background-edge-hint" role="status"></p>
+            <label class="background-checkbox"><input id="background-aggressive" type="checkbox"> Aggressive color removal</label>
+            <div id="background-aggressive-settings" hidden>
+              <label class="field-label" for="background-aggressive-amount">Aggressive strength <strong id="background-aggressive-value">50%</strong></label>
+              <input id="background-aggressive-amount" type="range" min="0" max="100" value="50">
+            </div>
+            <p class="background-edge-hint">Detects colors along the image border and removes connected background. Aggressive also removes enclosed matching colors and widens the color range.</p>
+          </div>
+          <div id="background-key-color-field">
+            <label class="field-label" for="background-key-color">Key color</label>
+            <input id="background-key-color" type="color" value="#00ff00" aria-label="Key color">
+          </div>
+          <div id="background-sample-color-field" class="field-label" hidden>Sampled color <span class="sampled-color"><i id="background-color-swatch"></i><strong id="background-color-value">Not sampled</strong></span></div>
+          <label class="field-label" for="background-tolerance">Tolerance <strong id="background-tolerance-value">128</strong></label>
+          <input id="background-tolerance" type="range" min="0" max="255" value="128">
+          <label id="background-connected-field" class="background-checkbox"><input id="background-connected" type="checkbox"> Connected background only</label>
+          </fieldset>
+          <fieldset class="background-section">
+            <legend>Edge shape</legend>
+            <label class="background-checkbox"><input id="background-edge-smoothing-enabled" type="checkbox"> Anti-alias cutout edges</label>
+            <div id="background-edge-smoothing-settings" hidden>
+              <label class="field-label" for="background-edge-smoothing-amount">Edge smoothing <strong id="background-edge-smoothing-amount-value">75%</strong></label>
+              <input id="background-edge-smoothing-amount" type="range" min="1" max="100" step="1" value="75" aria-label="Edge smoothing strength">
+              <p class="background-edge-hint">Smooth stair steps while keeping sharp corners and crisp lines.</p>
+            </div>
+            <label class="background-checkbox"><input id="background-softness-enabled" type="checkbox"> Edge blur</label>
+            <label class="field-label" for="background-softness">Blur amount <strong id="background-softness-value">4</strong></label>
+            <input id="background-softness" type="range" min="0" max="255" value="4" disabled>
+            <p id="background-softness-hint" class="background-edge-hint" hidden>Blur is inactive while anti-aliasing or recovering edge transparency.</p>
+          </fieldset>
+          <fieldset class="background-section" id="background-fringe-panel">
+            <legend>Color Cleanup</legend>
+            <label class="background-checkbox"><input id="background-fringe-enabled" type="checkbox"> Clean edge colors</label>
+            <div id="background-fringe-settings" hidden>
+              <label class="field-label" for="background-fringe-width">Cleanup width <strong id="background-fringe-width-value">4 px</strong></label>
+              <input id="background-fringe-width" type="range" min="1" max="32" value="4" aria-label="Edge cleanup width">
+              <label class="field-label" for="background-fringe-strength">Strength <strong id="background-fringe-strength-value">100%</strong></label>
+              <input id="background-fringe-strength" type="range" min="0" max="100" value="100" aria-label="Edge cleanup strength">
+              <p id="background-fringe-hint" class="background-edge-hint">Recover clean colors and transparency using nearby subject colors.</p>
+              <details class="background-details">
+              <summary>Cleanup options</summary>
+              <label class="field-label" for="background-fringe-method">Cleanup method</label>
+              <select id="background-fringe-method">
+                <option value="recover">Recover color and transparency</option>
+                <option value="replace">Replace color, preserve opacity</option>
+              </select>
+              <div id="background-fringe-keep-controls">
+                <label class="background-checkbox"><input id="background-fringe-keep-custom" type="checkbox"> Choose Keep color manually</label>
+                <div id="background-fringe-keep-field" hidden>
+                  <label class="field-label" for="background-fringe-keep-color">Keep color</label>
+                  <input id="background-fringe-keep-color" type="color" value="#000000" aria-label="Edge cleanup Keep color">
+                </div>
+              </div>
+              <label class="field-label" for="background-fringe-color-mode">Contamination color</label>
+              <select id="background-fringe-color-mode">
+                <option value="removal">Use background removal color</option>
+                <option value="custom">Choose a custom color</option>
+              </select>
+              <div id="background-fringe-color-field" hidden>
+                <label class="field-label" for="background-fringe-color">Color to replace</label>
+                <input id="background-fringe-color" type="color" value="#00ff00" aria-label="Fringe contamination color">
+              </div>
+              <div class="background-fringe-grid">
+                <div>
+                  <label class="field-label" for="background-fringe-tolerance">Color tolerance <strong id="background-fringe-tolerance-value">100</strong></label>
+                  <input id="background-fringe-tolerance" type="range" min="0" max="255" value="100">
+                </div>
+                <div>
+                  <label class="field-label" for="background-fringe-sample-distance">Sample distance <strong id="background-fringe-sample-distance-value">16 px</strong></label>
+                  <input id="background-fringe-sample-distance" type="range" min="1" max="64" value="16">
+                </div>
+              </div>
+              <div class="background-fringe-opacity">
+                <span class="field-label">Only edit pixels with opacity:</span>
+                <label>From <input id="background-fringe-min-opacity" type="number" min="0" max="100" step="1" value="0" aria-label="Minimum fringe opacity">%</label>
+                <label>To <input id="background-fringe-max-opacity" type="number" min="0" max="100" step="1" value="100" aria-label="Maximum fringe opacity">%</label>
+              </div>
+              <p class="background-edge-hint">Nearby colors are sampled within the same shape. Increase sample distance for a wide fringe; use a manual Keep color for very thin shapes.</p>
+              </details>
+            </div>
+          </fieldset>
+          <details class="background-section background-details">
+          <summary>Additional color adjustments</summary>
+          <label class="background-checkbox"><input id="background-edge-tint-enabled" type="checkbox"> Tint soft edges</label>
+          <div id="background-edge-color-field" hidden>
+            <label class="field-label" for="background-edge-color">Soft edge color</label>
+            <input id="background-edge-color" type="color" value="#000000" aria-label="Soft edge color">
+            <label class="field-label" for="background-edge-tint">Tint strength <strong id="background-edge-tint-value">100%</strong></label>
+            <input id="background-edge-tint" type="range" min="0" max="100" value="100">
+            <p class="background-edge-hint">Replace the background-colored fringe created by softness while keeping the character’s colors.</p>
+          </div>
+          <label id="background-spill-field" class="field-label" for="background-spill">Color spill suppression <strong id="background-spill-value">0%</strong></label>
+          <input id="background-spill" type="range" min="0" max="100" value="0">
+          <div id="background-spill-color-field">
+            <label class="field-label" for="background-spill-color">Suppressed edge color</label>
+            <input id="background-spill-color" type="color" value="#808080" aria-label="Suppressed edge color">
+          </div>
+          </details>
+        </aside>
+        </div>
+        <div id="background-error" class="modal-error" role="alert" hidden></div>
+        <div class="modal-actions">
+          <label class="background-checkbox"><input id="background-set-default" type="checkbox"> Save as defaults</label>
+          <button id="background-cancel" class="secondary-button" type="button">Cancel</button>
+          <button id="background-apply-all" class="secondary-button" type="button">Apply to all images</button>
+          <button id="background-apply" class="primary-button" type="submit"><span class="material-icon" aria-hidden="true">auto_fix_high</span> Apply</button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="operation-progress-dialog" class="modal-dialog progress-dialog">
+      <div class="modal-content">
+        <div class="modal-heading">
+          <div><h2 id="operation-progress-title">Working…</h2><p id="operation-progress-message"></p></div>
+        </div>
+        <progress id="operation-progress" aria-label="Operation progress"></progress>
+        <output id="operation-progress-value"></output>
+        <div class="modal-actions"><button id="operation-progress-cancel" class="secondary-button" type="button">Cancel export</button></div>
+      </div>
+    </dialog>
+    <div id="toast" role="status" aria-live="polite"></div>
+    <script type="importmap">{"imports":{"@frameline/tools":"./tools/sdk/index.mjs"}}</script>
+    <script type="module" src="./app.mjs"></script>
+  </body>
+</html>

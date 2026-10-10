@@ -1,0 +1,39 @@
+# Node.js dependencies and caches
+node_modules/
+.npm/
+
+# Python bytecode, virtual environments, and tool caches
+__pycache__/
+*.py[cod]
+.venv/
+/venv/
+/env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Test coverage and generated build output
+coverage/
+.coverage
+.coverage.*
+htmlcov/
+/dist/
+/out/
+/build/
+/*.tgz
+
+# Logs and local environment settings
+*.log
+.env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+
+# Operating system and editor temporary files
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.swp
+*.swo
+*~

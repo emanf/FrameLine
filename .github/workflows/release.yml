@@ -1,0 +1,165 @@
+name: Build and upload to latest release
+
+on:
+  workflow_dispatch:
+    inputs:
+      legacy_x86:
+        description: Include experimental Windows x86 (Electron 43, FFmpeg 4.4.1)
+        type: boolean
+        default: true
+      installers:
+        description: Also upload Windows installer, macOS DMG, and Linux AppImage
+        type: boolean
+        default: false
+      replace_existing:
+        description: Replace matching generated assets if already attached
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: latest-release-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Select release and source commit
+    if: github.actor == github.repository_owner && github.triggering_actor == github.repository_owner
+    runs-on: ubuntu-latest
+    outputs:
+      id: ${{ steps.release.outputs.id }}
+      tag: ${{ steps.release.outputs.tag }}
+      sha: ${{ steps.release.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Find latest published release
+        id: release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const {selectRelease} = require('./scripts/release-workflow.cjs');
+            await selectRelease({github, context, core});
+
+  package:
+    if: github.actor == github.repository_owner && github.triggering_actor == github.repository_owner
+    name: Build ${{ matrix.platform }} ${{ matrix.arch }}
+    needs: release
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows
+            arch: x64
+            runtime_arch: x64
+            node: '22'
+            runner: windows-latest
+          - platform: windows
+            arch: x86
+            runtime_arch: x86
+            node: '20'
+            runner: windows-latest
+          - platform: macos
+            arch: x64
+            runtime_arch: x64
+            node: '22'
+            runner: macos-15-intel
+          - platform: macos
+            arch: arm64
+            runtime_arch: arm64
+            node: '22'
+            runner: macos-latest
+          - platform: linux
+            arch: x64
+            runtime_arch: x64
+            node: '22'
+            runner: ubuntu-22.04
+          - platform: linux
+            arch: arm64
+            runtime_arch: arm64
+            node: '22'
+            runner: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+        if: matrix.arch != 'x86' || inputs.legacy_x86
+        with:
+          ref: ${{ needs.release.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        if: matrix.arch != 'x86' || inputs.legacy_x86
+        with:
+          node-version: ${{ matrix.node }}
+          architecture: ${{ matrix.runtime_arch }}
+      - uses: actions/setup-python@v5
+        if: matrix.arch != 'x86' || inputs.legacy_x86
+        with:
+          python-version: '3.12'
+          architecture: ${{ matrix.runtime_arch }}
+      - name: Install Python build dependencies
+        if: matrix.arch != 'x86' || inputs.legacy_x86
+        run: python -m pip install -r requirements-build.txt
+      - name: Build and verify package
+        if: matrix.arch != 'x86' || inputs.legacy_x86
+        run: python scripts/build.py --platform ${{ matrix.platform }} --arch ${{ matrix.arch }} --legacy-windows-x86 ${{ inputs.installers && '--installer' || '' }}
+      - uses: actions/upload-artifact@v4
+        if: always() && (matrix.arch != 'x86' || inputs.legacy_x86)
+        with:
+          name: FrameLine-${{ matrix.platform }}-${{ matrix.arch }}
+          path: |
+            build/releases/*/*/*/*.zip
+            build/releases/*/*/*/*.tar.gz
+            build/releases/*/*/*/*.exe
+            build/releases/*/*/*/*.dmg
+            build/releases/*/*/*/*.AppImage
+            build/releases/*/*/*/build.log
+            build/releases/*/*/*/build-manifest.json
+          if-no-files-found: warn
+
+  publish:
+    name: Upload verified packages
+    needs: [release, package]
+    if: github.actor == github.repository_owner && github.triggering_actor == github.repository_owner
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: FrameLine-*
+          path: build-artifacts
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify and collect release assets
+        env:
+          RELEASE_TAG: ${{ needs.release.outputs.tag }}
+          SOURCE_SHA: ${{ needs.release.outputs.sha }}
+          LEGACY_X86: ${{ inputs.legacy_x86 }}
+          INSTALLERS: ${{ inputs.installers }}
+        shell: bash
+        run: |
+          options=()
+          if [[ "$LEGACY_X86" == "true" ]]; then options+=(--legacy-windows-x86); fi
+          if [[ "$INSTALLERS" == "true" ]]; then options+=(--installers); fi
+          python scripts/prepare-release.py --source build-artifacts --output release-assets --tag "$RELEASE_TAG" --commit "$SOURCE_SHA" "${options[@]}"
+      - name: Attach assets to selected release
+        uses: actions/github-script@v7
+        env:
+          RELEASE_ID: ${{ needs.release.outputs.id }}
+          RELEASE_TAG: ${{ needs.release.outputs.tag }}
+          SOURCE_SHA: ${{ needs.release.outputs.sha }}
+          REPLACE_EXISTING: ${{ inputs.replace_existing }}
+        with:
+          script: |
+            const {publishAssets} = require('./scripts/release-workflow.cjs');
+            await publishAssets({github, context, core,
+              releaseId:Number(process.env.RELEASE_ID), tag:process.env.RELEASE_TAG,
+              sha:process.env.SOURCE_SHA, replace:process.env.REPLACE_EXISTING === 'true',
+              directory:'release-assets'});

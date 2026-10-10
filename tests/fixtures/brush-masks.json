@@ -1,0 +1,11 @@
+[
+  {"name":"smooth round dot","size":5,"points":[[0.512,0.534]],"shape":"round","feather":0,"antiAlias":true,"hash":"88a06be4bdf73529e9fa10f1bcc82518d380e366b34dcd2f97b666db889a82a4"},
+  {"name":"smooth round path","size":3,"points":[[0.2,0.21],[0.73,0.64],[0.24,0.23]],"shape":"round","feather":0,"antiAlias":true,"hash":"4267bdeb5672b7706155802d8aaf36a68abea43348e8529868c346ce9ae085ea"},
+  {"name":"smooth square path","size":4,"points":[[0.2,0.21],[0.73,0.64],[0.24,0.23]],"shape":"square","feather":0,"antiAlias":true,"hash":"7aefbdc6749ddc904beb0c2826a7528999671cae3ccc22fe2307ccdeb27642b1"},
+  {"name":"pixel round path","size":3,"points":[[0.2,0.21],[0.73,0.64],[0.24,0.23]],"shape":"round","feather":0,"antiAlias":false,"hash":"680d41615b3e4c5bfd7fd0b312ce13ee248d22c1acae9d5b5a1ef874802de3a9"},
+  {"name":"pixel square path","size":4,"points":[[0.2,0.21],[0.73,0.64],[0.24,0.23]],"shape":"square","feather":0,"antiAlias":false,"hash":"a089c88fe17c9df1b0f91e0ae7a0116af294af596e9854d5ec6c26bef0e9e5c9"},
+  {"name":"soft smooth edge","size":5,"points":[[0,0],[0.3,0.8],[1,1]],"shape":"round","feather":30,"antiAlias":true,"hash":"e3157c497936eb83dc0a09f0fc0dd96024c57acd28a845dc63124ae3b103a7d4"},
+  {"name":"soft pixel edge","size":5,"points":[[0,0],[0.3,0.8],[1,1]],"shape":"round","feather":30,"antiAlias":false,"hash":"c1c10c34192356915d9bad30c7cbfff8669d7ea5409258cd373f3207a4cf5b38"},
+  {"name":"soft square","size":6,"points":[[0.5,0.5]],"shape":"square","feather":60,"antiAlias":true,"hash":"8615f1b3b7384c7cfe5a1eee63fd610a1fecc909d9d5ae62a3d6ec4dcd2e3dd0"},
+  {"name":"pixel single","size":1,"points":[[0.2,0.21],[0.73,0.64]],"shape":"round","feather":0,"antiAlias":false,"hash":"997af84c992c2b883de14cbe0ddae82a4d704a3180195d03b07a7d620f8e6fbb"}
+]

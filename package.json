@@ -1,0 +1,22 @@
+{
+  "name": "frameline",
+  "version": "1.0.0",
+  "description": "A frame-based image timeline editor",
+  "main": "src/main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test",
+    "test:ui": "electron scripts/electron-smoke.cjs",
+    "test:main": "electron scripts/electron-processing-smoke.cjs",
+    "test:backend": "python -m unittest discover -s tests -p test_*.py"
+  },
+  "devDependencies": {
+    "electron": "^44.5.1"
+  },
+  "dependencies": {
+    "@fontsource/material-symbols-rounded": "^5.3.8",
+    "ffmpeg-static": "^5.3.0",
+    "ffprobe-static": "^3.1.0",
+    "sharp": "^0.35.5"
+  }
+}

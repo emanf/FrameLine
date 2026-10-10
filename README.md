@@ -32,11 +32,11 @@ npm install
 npm start
 ```
 
-On Windows, you can also use `run.bat` to check dependencies and launch the app. FFmpeg, FFprobe, and the SVG/AVIF decoder are included with the npm dependencies.
+On Windows, you can also use `run.bat` to check dependencies and launch the app..
 
 ## Features and usage
 
-- **Media import:** Import common image and video formats, including SVG and AVIF. Extract video frames at the project FPS, a time interval, or a fixed image count.
+- **Media import:** Import common image and video formats. Extract video frames at the project FPS, a time interval, or a fixed image count.
 - **Blank images:** Create batches with preset or custom dimensions and transparent or solid backgrounds. Existing artwork can supply dimensions and a background color sampled from its corners.
 - **Batch rename:** Rename all or selected images with numbered sequences or patterns such as `Run_{number}{ext}`. Set number padding, start, increment, order, and duplicate handling; source exports use the resulting names.
 - **Frame-based timeline:** Reorder clips, resize durations in whole frames, and move or adjust multiple clips together. Right-click to delete frames before or after a clip while retaining the imported images.

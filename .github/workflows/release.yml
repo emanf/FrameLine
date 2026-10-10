@@ -6,15 +6,15 @@ on:
       legacy_x86:
         description: Include experimental Windows x86 (Electron 43, FFmpeg 4.4.1)
         type: boolean
-        default: true
+        default: false
       installers:
         description: Also upload Windows installer, macOS DMG, and Linux AppImage
         type: boolean
-        default: false
+        default: true
       replace_existing:
         description: Replace matching generated assets if already attached
         type: boolean
-        default: false
+        default: true
 
 permissions:
   contents: read

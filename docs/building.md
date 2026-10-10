@@ -82,7 +82,7 @@ The repository contains one GitHub Actions workflow: **Build and upload to lates
 1. Push the workflow and build scripts to the default branch.
 2. Create and publish a stable release whose tag includes the build scripts, `requirements-build.txt`, and application source.
 3. Open **Actions → Build and upload to latest release → Run workflow**.
-4. Keep Windows x86 enabled to build all six targets. It uses the experimental legacy runtime described above. Optionally enable installers.
+4. Windows x86 is off by default; enable it to build all six targets with the experimental legacy runtime described above. Installers and replacement of matching generated assets are on by default.
 5. Wait for the builds and upload job. Packages appear under the existing release's Assets, together with `SHA256SUMS.txt` and `FrameLine-builds.json`.
 
 The workflow selects GitHub's latest published stable release when it starts and builds the exact commit referenced by that release's tag. Drafts and prereleases are excluded. If another release appears during the build, uploads still go to the originally selected release. A missing release, immutable release, or moved tag stops the workflow with a clear error.

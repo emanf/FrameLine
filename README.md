@@ -4,7 +4,7 @@
 
 # FrameLine
 
-Animating an AI-generated character with image-to-video? FrameLine helps you turn that video into usable animation assets: extract PNG frames, remove backgrounds, clean up edges, and keep only the frames you need.
+FrameLine turns videos and image sequences into usable animation assets: extract PNG frames, remove backgrounds, clean up edges, and keep only the frames you need.
 
 Built for 2D animators, it also works with hand-drawn artwork and other image sequences.
 
@@ -24,7 +24,7 @@ If a build for your platform is not listed, use the source-code option below.
 
 ### Option 2: Run from source
 
-Choose **Code → Download ZIP** and extract it, or clone this repository. Install Node.js 20 or newer, npm, and Python 3.12 or newer, then open a terminal in the project folder and run:
+Choose **Code → Download ZIP** and extract it, or clone this repository. Install [Node.js 20 or newer](https://nodejs.org/en/download) with npm and [Python 3.12 or newer](https://www.python.org/downloads/), then open a terminal in the project folder and run:
 
 ```sh
 python -m pip install -r requirements.txt

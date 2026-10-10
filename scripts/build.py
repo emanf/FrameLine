@@ -163,6 +163,7 @@ def builder_config(target, backend, media, output, electron_version, installer=F
     config = {
         "appId": "com.emanf.frameline", "productName": "FrameLine",
         "electronVersion": electron_version, "npmRebuild": False,
+        "afterPack": str(ROOT / "scripts/windows-icon.cjs"),
         "directories": {"output": str(output)},
         "artifactName": "FrameLine-${version}-" + target.system + "-" + target.arch + ".${ext}",
         "files": ["src/**/*", "package.json", "node_modules/**/*",
@@ -173,7 +174,7 @@ def builder_config(target, backend, media, output, electron_version, installer=F
                            {"from": "extensions", "to": "extensions"},
                            {"from": "src/assets/icons", "to": "icons"}],
         "win": {"target": formats if target.system == "windows" else ["zip"],
-                "icon": "src/assets/icons/frameline.ico", "signAndEditExecutable": True},
+                "icon": "src/assets/icons/frameline.ico", "signAndEditExecutable": False},
         "mac": {"target": formats if target.system == "macos" else ["zip"], "category": "public.app-category.graphics-design",
                 "identity": None, "icon": "src/assets/icons/frameline.icns"},
         "linux": {"target": formats if target.system == "linux" else ["tar.gz"],
@@ -272,7 +273,9 @@ def build(target, options, node, npm):
     work_root = ROOT / "build/.work"
     work_root.mkdir(parents=True, exist_ok=True)
     try:
-        with tempfile.TemporaryDirectory(prefix="frameline-", dir=work_root) as temporary:
+        # A locked staging file must not hide the build's original error on Windows.
+        with tempfile.TemporaryDirectory(prefix="frameline-", dir=work_root,
+                                         ignore_cleanup_errors=True) as temporary:
             work = Path(temporary).resolve()
             stage = work / "app"
             stage.mkdir()
@@ -389,6 +392,9 @@ def main(argv=None):
 
 
 if __name__ == "__main__":
+    # Build tools emit Unicode status symbols even when Windows uses a legacy code page.
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
     try:
         raise SystemExit(main())
     except (ValueError, RuntimeError, subprocess.SubprocessError, OSError) as error:

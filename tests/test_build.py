@@ -34,7 +34,7 @@ class BuildTests(unittest.TestCase):
     def test_native_resources_are_external_and_platform_names_explicit(self):
         for target in build.TARGETS:
             config = build.builder_config(target, Path('/engine'), Path('/media'), Path('/out'), '43.0.0')
-            self.assertEqual([item['to'] for item in config['extraResources']], ['backend', 'media', 'extensions'])
+            self.assertEqual([item['to'] for item in config['extraResources']], ['backend', 'media', 'extensions', 'icons'])
             self.assertIn(target.system + '-' + target.arch, config['artifactName'])
             self.assertIsNone(config['publish'])
             self.assertTrue(config['asarUnpack'])

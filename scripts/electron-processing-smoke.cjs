@@ -1,5 +1,5 @@
 // Exercise production IPC/preload/Python workers instead of the UI suite's mocks.
-const {app, BrowserWindow, dialog}=require('electron');
+const {app, BrowserWindow, dialog, nativeImage}=require('electron');
 const fs=require('node:fs');
 const os=require('node:os');
 const path=require('node:path');
@@ -18,6 +18,9 @@ app.whenReady().then(async()=>{
   window.webContents.setBackgroundThrottling(false);
   try {
     if(window.webContents.isLoading()) await once(window.webContents,'did-finish-load');
+    const {applicationIconPath} = require('../src/main/application-icon.cjs');
+    assert.equal(nativeImage.createFromPath(applicationIconPath()).isEmpty(), false, 'native app icon loads');
+    assert.equal(await window.webContents.executeJavaScript(`(() => {const icon=document.querySelector('.brand-icon'); return icon.complete && icon.naturalWidth > 0;})()`), true, 'title bar icon loads');
     let secondLaunch=false;
     app.once('second-instance',()=>{secondLaunch=true;});
     const secondary=spawn(process.execPath,[path.join(__dirname,'electron-singleton-probe.cjs'),temporary],

@@ -30,7 +30,8 @@ button { cursor: pointer; }
 }
 .material-icon { display: inline-flex; align-items: center; justify-content: center; font-family: "Material Symbols Rounded"; font-weight: normal; font-style: normal; font-size: 18px; line-height: 1; letter-spacing: normal; text-transform: none; white-space: nowrap; word-wrap: normal; direction: ltr; font-feature-settings: "liga"; font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 20; -webkit-font-smoothing: antialiased; }
 .topbar { height: 48px; padding: 0 0 0 13px; display: flex; align-items: center; gap: 13px; border-bottom: 1px solid #202020; background: #0e0e0e; -webkit-app-region: drag; user-select: none; }
-.brand { display: flex; flex-shrink: 0; align-items: center; font-size: 11px; font-weight: 750; letter-spacing: 1.8px; }
+.brand { display: flex; flex-shrink: 0; align-items: center; gap: 7px; font-size: 11px; font-weight: 750; letter-spacing: 1.8px; }
+.brand-icon { width: 24px; height: 24px; flex-shrink: 0; object-fit: contain; }
 .project-title { width: 200px; min-width: 80px; max-width: 240px; height: 30px; padding: 0 8px; overflow: hidden; text-overflow: ellipsis; color: #ddd; background: #090909; border: 1px solid #343434; border-radius: 4px; outline: none; }
 .project-title:hover { border-color: #666; }
 .project-title:focus { border-color: #aaa; }

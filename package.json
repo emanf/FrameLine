@@ -8,7 +8,8 @@
     "test": "node --test",
     "test:ui": "electron scripts/electron-smoke.cjs",
     "test:main": "electron scripts/electron-processing-smoke.cjs",
-    "test:backend": "python -m unittest discover -s tests -p test_*.py"
+    "test:backend": "python -m unittest discover -s tests -p test_*.py",
+    "icons": "node scripts/generate-icons.mjs"
   },
   "devDependencies": {
     "electron": "^44.5.1"

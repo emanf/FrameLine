@@ -1,9 +1,13 @@
-const {BrowserWindow} = require('electron');
+const {app, BrowserWindow} = require('electron');
 const path = require('node:path');
+const {applicationIconPath} = require('./application-icon.cjs');
 
 /** Create the isolated desktop window and guard unsaved editor state on close. */
 function createWindow() {
+  const icon = applicationIconPath();
+  if (process.platform === 'darwin') app.dock?.setIcon(icon);
   const window = new BrowserWindow({
+    icon,
     width: 1440,
     height: 900,
     minWidth: 800,

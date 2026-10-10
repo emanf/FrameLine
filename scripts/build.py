@@ -119,6 +119,13 @@ def copy_media_license(target, media, override):
         if companion.is_file():
             shutil.copy2(companion, media / "ffmpeg.LICENSE")
         return
+    suffix = '.exe' if target.system == 'windows' else ''
+    cached_binary = ROOT / 'node_modules/ffmpeg-static' / f'ffmpeg{suffix}'
+    cached_license = Path(str(cached_binary) + '.LICENSE')
+    checksum = FFMPEG_HASHES.get(target.name)
+    if checksum and cached_binary.is_file() and cached_license.is_file() and hashlib.sha256(cached_binary.read_bytes()).hexdigest() == checksum:
+        shutil.copy2(cached_license, media / 'ffmpeg.LICENSE')
+        return
     release = "b4.4.1" if target.arch == "x86" else "b6.1.1"
     url = ("https://github.com/eugeneware/ffmpeg-static/releases/download/"
            f"{release}/{target.node_platform}-{target.node_arch}.LICENSE")
@@ -163,11 +170,14 @@ def builder_config(target, backend, media, output, electron_version, installer=F
         "asar": True, "asarUnpack": ["node_modules/@img/**/*", "node_modules/sharp/**/*"],
         "extraResources": [{"from": str(backend), "to": "backend"},
                            {"from": str(media), "to": "media"},
-                           {"from": "extensions", "to": "extensions"}],
-        "win": {"target": formats if target.system == "windows" else ["zip"], "signAndEditExecutable": False},
+                           {"from": "extensions", "to": "extensions"},
+                           {"from": "src/assets/icons", "to": "icons"}],
+        "win": {"target": formats if target.system == "windows" else ["zip"],
+                "icon": "src/assets/icons/frameline.ico", "signAndEditExecutable": True},
         "mac": {"target": formats if target.system == "macos" else ["zip"], "category": "public.app-category.graphics-design",
-                "identity": None},
-        "linux": {"target": formats if target.system == "linux" else ["tar.gz"], "category": "Graphics"},
+                "identity": None, "icon": "src/assets/icons/frameline.icns"},
+        "linux": {"target": formats if target.system == "linux" else ["tar.gz"],
+                  "category": "Graphics", "icon": "src/assets/icons/frameline-512.png"},
         "nsis": {"oneClick": False, "allowToChangeInstallationDirectory": True},
         "publish": None,
     }

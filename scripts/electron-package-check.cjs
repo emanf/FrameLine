@@ -17,6 +17,19 @@ async function verify() {
   assert.equal((await sharp(avif).metadata()).format, 'heif');
   assert.equal((await sharp(Buffer.from('<svg width="8" height="8"><rect width="8" height="8" fill="red"/></svg>')).png().toBuffer()).length > 0, true);
   assert.ok((await fs.stat(path.join(resources, 'app.asar', 'node_modules/@fontsource/material-symbols-rounded/400.css'))).size > 0);
+  const icon = await sharp(path.join(resources, 'icons', 'frameline-512.png')).metadata();
+  assert.equal(icon.width, 512);
+  assert.equal(icon.hasAlpha, true);
+  assert.ok((await fs.stat(path.join(resources, 'icons', 'frameline.ico'))).size > 0);
+  assert.ok((await fs.stat(path.join(resources, 'icons', 'frameline.icns'))).size > 0);
+  if (process.platform === 'win32') {
+    const ico = await fs.readFile(path.join(resources, 'icons', 'frameline.ico'));
+    const entry = 6 + 16 * (ico.readUInt16LE(4) - 1);
+    const length = ico.readUInt32LE(entry + 8);
+    const offset = ico.readUInt32LE(entry + 12);
+    const executable = await fs.readFile(path.join(resources, '..', 'FrameLine.exe'));
+    assert.notEqual(executable.indexOf(ico.subarray(offset, offset + length)), -1, 'FrameLine.exe embeds the approved icon');
+  }
   const {mediaPaths} = releaseRequire('./src/main/runtime-paths.cjs');
   const media = mediaPaths({packaged:true});
   for (const binary of Object.values(media)) execFileSync(binary, ['-version'], {windowsHide:true, stdio:'pipe'});

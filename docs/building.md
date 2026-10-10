@@ -97,6 +97,8 @@ On a personal fork, the owner check follows the fork's repository owner, and upl
 
 ## Distribution and extensions
 
+The app icon source and platform formats live in `src/assets/icons`. Regenerate ICO, ICNS, and Linux PNG files with `node scripts/generate-icons.mjs` after updating the source PNG. Builds embed these icons in platform packages and copy the native window icons to `resources/icons`.
+
 Builds are unsigned by default. Signing and notarization require a separate setup; the manual workflow handles uploading unsigned packages. The optional Linux AppImage requires the system packaging tools used by Electron Builder.
 
 The image engine and media binaries live outside `app.asar`; Sharp's native libraries are unpacked. Extensions included in the checkout are copied to `resources/extensions`, outside the archive, so Python can load their processors. Additional tools can be installed in the user-data `extensions` directory. Python processors can use the bundled Pillow and standard library; plugins requiring additional Python packages need those dependencies included in a custom build.

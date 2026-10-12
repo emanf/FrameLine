@@ -48,6 +48,7 @@ export class PlaybackController extends ControllerBase {
   /** Resolve pending edits and toggle playback within the project loop range. */
   togglePlayback() {
     const runtime = this.application;
+    if(runtime.localBrushPointerId != null || runtime.refineBusy) return;
     if (runtime.playing) {
       runtime.stopPlayback();
     } else if (runtime.vm.totalFrames) {

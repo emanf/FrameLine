@@ -105,6 +105,12 @@ def brush_mask(stroke, width, height, check_cancelled=lambda: None):
     local = Image.frombytes('L', (w,h), bytes(max(0,min(255,math.floor(value+.5))) for value in values))
     mask = Image.new('L', (width,height), 0)
     mask.paste(local, (left,top))
+    if stroke.get('ignoreStrokes'):
+        from protected_effects import protection_mask
+        from PIL import ImageMath
+        ignored = protection_mask(stroke['ignoreStrokes'], (width,height), check_cancelled)
+        mask = ImageMath.lambda_eval(lambda operands: (operands['paint']*(255-operands['ignored'])+127)/255,
+                                     paint=mask.convert('I'),ignored=ignored.convert('I')).convert('L')
     return mask
 
 

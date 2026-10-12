@@ -31,7 +31,7 @@ class ToolPluginService {
           if ((await fs.stat(manifestPath)).size > 65536) throw new Error('Manifest is too large.');
           const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8'));
           if (!/^[a-z][a-z0-9-]{0,63}$/.test(manifest.id) || manifest.apiVersion !== 1 || typeof manifest.name !== 'string' || !manifest.name.trim() || manifest.name.length > 80) throw new Error('Invalid plugin ID, name, or API version.');
-          if (this.plugins.has(manifest.id) || ['clear','background','crop','outline','padding','refine','clean','hand','brush','healing','eraser'].includes(manifest.id)) throw new Error('Plugin ID is already registered.');
+          if (this.plugins.has(manifest.id) || ['clear','background','crop','outline','padding','refine','clean','hand','brush','healing','eraser','ignore','recover'].includes(manifest.id)) throw new Error('Plugin ID is already registered.');
           const entryPath = await this.resolveFile(folder, manifest.entry, '.mjs');
           const processor = manifest.processor ? await this.resolveFile(folder, manifest.processor, '.py') : null;
           this.plugins.set(manifest.id, {id:manifest.id,name:manifest.name,entryURL:pathToFileURL(entryPath).href,processor});

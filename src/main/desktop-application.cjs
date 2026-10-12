@@ -10,6 +10,7 @@ const {registerProjectHandlers} = require('./ipc/project-handlers.cjs');
 const {registerExportHandlers} = require('./ipc/export-handlers.cjs');
 const {registerWindowHandlers} = require('./ipc/window-handlers.cjs');
 const {registerToolsHandlers} = require('./ipc/tools-handlers.cjs');
+const {registerAppHandlers} = require('./ipc/app-handlers.cjs');
 
 /** Own worker lifetimes, plugin discovery, and domain-specific IPC registration. */
 class DesktopApplication {
@@ -40,6 +41,7 @@ class DesktopApplication {
     registerExportHandlers(this);
     registerWindowHandlers(this);
     registerToolsHandlers(this);
+    registerAppHandlers();
     createWindow();
     app.on('activate', () => {if (BrowserWindow.getAllWindows().length === 0) createWindow();});
     app.on('will-quit', () => this.dispose());

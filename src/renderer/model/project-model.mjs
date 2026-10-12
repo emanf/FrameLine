@@ -80,6 +80,16 @@ export function validateStroke(stroke) {
       || !Number.isInteger(stroke.tolerance) || !between(stroke.tolerance, 0, 255)))) {
     throw new Error("Project contains an invalid paint stroke.");
   }
+  if(stroke.ignoreStrokes !== undefined) validateIgnoreStrokes(stroke.ignoreStrokes);
+}
+
+/** Validate paint-independent protection marks without allowing recursively nested masks. */
+export function validateIgnoreStrokes(strokes) {
+  if(!Array.isArray(strokes)) throw new Error('Project contains invalid Ignore marks.');
+  for(const stroke of strokes) {
+    if(!object(stroke) || stroke.ignoreStrokes !== undefined || (stroke.feather ?? 0)!==0) throw new Error('Project contains invalid Ignore marks.');
+    validateStroke({...stroke,tool:'brush',color:'#ffffff',opacity:1});
+  }
 }
 
 function validateDimensions(dimensions) {
@@ -127,6 +137,9 @@ export function validateProject(candidate) {
     validateCrop(image.crop);
     validateOutline(image.outline);
     validateOutline(image.outlineSettings);
+    if(image.ignoreStrokes !== undefined) validateIgnoreStrokes(image.ignoreStrokes);
+    if(image.ignoreEnabled !== undefined && typeof image.ignoreEnabled !== 'boolean') throw new Error('Invalid Ignore enabled setting.');
+    if(image.originalOffset !== undefined && (!object(image.originalOffset) || !Number.isFinite(image.originalOffset.x) || !Number.isFinite(image.originalOffset.y))) throw new Error('Invalid original image alignment.');
     imageIds.add(image.id);
   }
   const clipIds = new Set();

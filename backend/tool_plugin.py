@@ -70,6 +70,7 @@ def process_tool_plugin(request, render_image, report_progress, check_cancelled)
     report_progress(0, 100, "Preparing tool image")
     image = render_image(request["path"], request.get("paint_strokes", []), request.get("crop"), request.get("outline")).convert("RGBA")
     processor = LOADER.load(request["processor"])
+    protected_source = image.copy() if request.get('effect_ignore') else image
     context = ProcessingContext(report_progress, check_cancelled)
     with contextlib.redirect_stdout(sys.stderr):
         result = processor.process(image, request.get("options", {}), context)
@@ -77,6 +78,8 @@ def process_tool_plugin(request, render_image, report_progress, check_cancelled)
         raise ValueError("Processor must return a valid Pillow image within supported dimensions.")
     check_cancelled()
     output = Path(request["output"])
+    from protected_effects import protect_effect
+    result = protect_effect(protected_source,result.convert('RGBA'),request.get('effect_ignore'),check_cancelled)
     output.parent.mkdir(parents=True, exist_ok=True)
     result.convert("RGBA").save(output, format="PNG", compress_level=1)
     report_progress(100, 100, "Tool complete")

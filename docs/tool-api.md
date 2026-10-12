@@ -38,6 +38,8 @@ Built-in tools live in individual files under `src/renderer/tools/builtin/`. The
 
 Installed tools use generated button IDs and cannot override them. `previewMethod` and `applyMethod` are internal built-in adapters to existing preload methods; extension processors use their manifest's Python entry or override `process()`.
 
+Toolbar sections use two columns. `clear` places restoration tools beside Clear and Recover above the first divider. `magic` and `features` share the image-effects grid; `basic` occupies the separate Hand/brush grid. Groups control placement, while `mode` controls activation and Enable behavior. A pointer tool in `clear`, such as Recover, still operates without an Enable checkbox.
+
 ## Field schemas
 
 Each field needs a unique `key` (lowercase letter followed by letters, digits, or hyphens; up to 32 characters), a nonempty `label`, a `type`, and a `defaultValue`. Optional `suffix` displays a unit after its value.
@@ -82,7 +84,7 @@ Pointer events contain normalized `x/y`, `pressure`, `pointerId`, `button`, `shi
 | `materializeImage(image)` | Edited source with `temporary` ownership flag |
 | `loadImage(image)` | Decode a path into an HTML Image |
 | `storeCanvas(canvas)` | Save an owned PNG, without committing a project edit |
-| `previewCanvas(canvas)` | Show a full-image, uncommitted custom draft |
+| `previewCanvas(canvas)` | Asynchronously show a full-image draft while preserving active Ignore marks; returns a Promise |
 | `commitCanvas(canvas)` | Save and commit one current-image history step with progress and revision validation |
 | `releaseImages(paths)` | Discard owned temporary outputs |
 | `mountPanel(element)` | Mount custom HTML controls with a host-assigned panel ID |
@@ -108,3 +110,21 @@ Processor modules have a package namespace, allowing relative helper imports. Th
 ## State boundaries
 
 The registry holds tool instances and immutable definitions. The options view model holds validated control values. `EditorSessionViewModel` holds pending drafts and preview scheduling state. `TimelineViewModel` owns the project and persistent history. Tool preference values are local settings; applied PNGs are project assets. A plugin must not add arbitrary project fields without updating validation, persistence, and tests.
+
+## Protected areas and original alignment
+
+An image may contain `ignoreStrokes`, an array of normalized brush paths with pixel `size`, `shape` (`round` or `square`), `antiAlias`, and `points`. `ignoreEnabled: false` temporarily bypasses protection. These marks have zero feather and are separate from visible paint strokes. The host applies their union after Python processing, JavaScript processor overrides, and custom canvas previews/commits. Extensions should return their normal result rather than applying the protection a second time. Expanded extension canvases align the old image at their center.
+
+`originalOffset: {x, y}` records where the imported original begins in current pixel coordinates. The host rebases it and protection marks when a tool bakes a crop, padding, or outline. Recover uses this alignment and creates an ordinary working PNG; plugin implementations do not need to handle recovery recipes. The built-in IDs `ignore` and `recover` are reserved along with the other registered tools.
+
+| Image field | Meaning |
+| --- | --- |
+| `originalPath`, `originalDimensions` | Immutable imported source and its pixel dimensions |
+| `originalOffset` | Finite pixel translation from the original into the current working canvas; negative values can follow a crop |
+| `ignoreStrokes` | Saved protection paths with normalized coordinates, positive pixel size, round/square shape, optional boolean anti-aliasing, and zero feather |
+| `ignoreEnabled` | Optional boolean; protection is active unless explicitly false |
+| `paintStrokes[].ignoreStrokes` | Protection snapshot captured for an individual paint stroke |
+
+The red overlay and its visibility setting are not image pixels. `previewIgnoreVisible` is a local preference, synchronized by the toolbar eye button and tool-panel checkbox. Disabling the overlay does not disable the mask. Recover bypasses protection as an explicit restoration command; Clear restores the complete original and removes protection.
+
+Python effect requests receive `effect_ignore` in the materialized image's coordinates. The host handles compositing after the processor returns, including processors that modify their input in place. JavaScript overrides and custom canvas results receive equivalent protection. An expanded canvas uses a centered integer translation; extensions needing different geometric alignment require an explicit host integration rather than silently shifting protected pixels.

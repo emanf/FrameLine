@@ -1,5 +1,6 @@
 """Produce owned PNG outputs for live image tools and committed processing."""
 from pathlib import Path
+from protected_effects import protect_effect
 
 
 class ImageCommands:
@@ -15,6 +16,7 @@ class ImageCommands:
         image = context.render_image_with_strokes(request['path'])
         context.report_progress(20, 100, 'Calculating outline…')
         result = context.apply_image_outline(image, request.get('outline'))
+        result = protect_effect(image,result,request.get('effect_ignore'),context.check_cancelled)
         context.report_progress(90, 100, 'Saving outlined image…')
         output = Path(request['output'])
         output.parent.mkdir(parents=True, exist_ok=True)
@@ -29,6 +31,7 @@ class ImageCommands:
         context.report_progress(5, 100, 'Preparing edited image…')
         image = context.render_image_with_strokes(request['path'], request.get('paint_strokes', []), request.get('crop'), request.get('outline'))
         result = refine_cutout(image, options, context.check_cancelled, lambda current, total, message: context.report_progress(10 + current / total * 80, 100, message))
+        result = protect_effect(image,result,request.get('effect_ignore'),context.check_cancelled)
         context.report_progress(90, 100, 'Saving refined image…')
         output = Path(request['output'])
         output.parent.mkdir(parents=True, exist_ok=True)
@@ -43,6 +46,7 @@ class ImageCommands:
         context.report_progress(5, 100, 'Preparing edited image…')
         image = context.render_image_with_strokes(request['path'], request.get('paint_strokes', []), request.get('crop'), request.get('outline'))
         result = clean_image_pixels(image, options, context.check_cancelled, lambda current, total, message: context.report_progress(10 + current / total * 80, 100, message))
+        result = protect_effect(image,result,request.get('effect_ignore'),context.check_cancelled)
         context.report_progress(90, 100, 'Saving cleaned image…')
         output = Path(request['output'])
         output.parent.mkdir(parents=True, exist_ok=True)

@@ -23,6 +23,7 @@ export class ClipMenuController extends ControllerBase {
       ["Cut", "content_cut", () => { runtime.stopPlayback(); runtime.vm.cutSelected(); runtime.renderPlayButton(); runtime.showSuccess("Cut selected clips — paste at the playhead with Ctrl+V"); }],
       ...(runtime.vm.clipboard?.clips.length ? [["Paste at playhead", "content_paste", () => runtime.vm.pasteClips()]] : []),
       [multiple ? "Duplicate selected" : "Duplicate", "copy_all", () => runtime.vm.duplicateSelected()],
+      ...(multiple ? [["Reverse", "swap_horiz", () => {runtime.stopPlayback(); runtime.vm.reverseSelected(); runtime.renderPlayButton();}]] : []),
       ["Delete", "delete", () => runtime.confirmRemoveClip(clipId)],
       ["Delete frames before", "arrow_back", () => deleteSide("before"), clipIndex <= 0],
       ["Delete frames after", "arrow_forward", () => deleteSide("after"), clipIndex < 0 || clipIndex >= runtime.vm.project.clips.length - 1],

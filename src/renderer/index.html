@@ -22,6 +22,7 @@
         <button id="redo" data-tooltip="Redo (Ctrl+Y)" disabled><span class="material-icon" aria-hidden="true">redo</span> Redo</button>
       </div>
       <div class="window-controls">
+        <button id="app-about" class="window-control about-control" type="button" data-tooltip="About FrameLine" aria-label="About FrameLine"><span class="material-icon" aria-hidden="true">info</span></button>
         <button id="window-minimize" class="window-control" data-tooltip="Minimize" aria-label="Minimize"><span class="material-icon" aria-hidden="true">minimize</span></button>
         <button id="window-maximize" class="window-control" data-tooltip="Maximize" aria-label="Maximize"><span class="material-icon" aria-hidden="true">fullscreen</span></button>
         <button id="window-close" class="window-control close-control" data-tooltip="Close" aria-label="Close"><span class="material-icon" aria-hidden="true">close</span></button>
@@ -66,6 +67,7 @@
                   <label class="preview-background-transparent"><input id="preview-background-transparent" type="checkbox" checked> Transparent</label>
                 </div>
               </div>
+              <button id="preview-ignore-toggle" class="preview-grid-toggle grid-enabled" type="button" aria-label="Hide Ignore overlay" aria-pressed="true" aria-controls="preview-ignore-overlay" data-tooltip="Hide Ignore overlay (protection stays active)"><span class="material-icon" aria-hidden="true">visibility</span></button>
               <div id="preview-grid-control" class="preview-grid-control">
                 <button id="preview-grid-toggle" class="preview-grid-toggle" type="button" aria-label="Grid settings" aria-haspopup="true" aria-expanded="false" aria-controls="preview-grid-popover" data-tooltip="Grid settings"><span class="material-icon" aria-hidden="true">grid_on</span></button>
                 <div id="preview-grid-popover" class="preview-grid-popover" role="group" aria-label="Grid settings" hidden>
@@ -89,10 +91,12 @@
           </div>
           <div class="preview-workspace">
             <aside class="preview-toolbox" aria-label="Preview tools">
+              <div class="preview-tool-group" data-tool-group="clear" role="group" aria-label="Restore tools"></div>
               <div class="tool-divider" role="separator"></div>
-              <div class="preview-tool-group" data-tool-group="magic" role="group" aria-label="Magic tools"></div>
-              <div class="tool-divider" role="separator"></div>
-              <div class="preview-tool-group" data-tool-group="features" role="group" aria-label="Enable features"></div>
+              <div class="preview-tool-area" data-tool-area="effects" role="group" aria-label="Image effects">
+                <div class="preview-tool-group" data-tool-group="magic" role="group" aria-label="Magic tools"></div>
+                <div class="preview-tool-group" data-tool-group="features" role="group" aria-label="Enable features"></div>
+              </div>
               <div class="tool-divider" role="separator"></div>
               <div class="preview-tool-group" data-tool-group="basic" role="group" aria-label="Basic tools"></div>
             </aside>
@@ -171,6 +175,15 @@
                 <progress id="preview-padding-progress" class="tool-processing-progress" aria-label="Preparing padding preview" hidden></progress>
               </div>
               <div id="preview-brush-controls" class="brush-controls" hidden>
+                <div id="preview-local-brush-controls" hidden>
+                  <p id="preview-local-brush-help" class="preview-options-content"></p>
+                  <div id="preview-ignore-settings">
+                    <label class="tool-checkbox"><input id="preview-ignore-enabled" type="checkbox" checked> Protect marked areas</label>
+                    <label class="tool-checkbox"><input id="preview-ignore-visible" type="checkbox" checked> Show Ignore overlay</label>
+                    <button id="preview-ignore-clear" class="secondary-button" type="button">Clear Ignore marks</button>
+                  </div>
+                  <progress id="preview-local-brush-progress" class="tool-processing-progress" aria-label="Preparing brush" hidden></progress>
+                </div>
                 <div id="preview-healing-controls" hidden>
                   <p class="preview-options-content">Paint over mixed edge colors to recover transparency.</p>
                   <label class="tool-checkbox"><input id="preview-healing-auto-keep" type="checkbox"> Auto Keep nearby colors (hair)</label>
@@ -219,13 +232,13 @@
                   </label>
                   <input id="preview-brush-size-slider" type="range" min="1" max="512" value="12" aria-label="Brush size slider">
                 </div>
-                <div class="tool-option">
+                <div id="preview-brush-feather-field" class="tool-option">
                   <label for="preview-brush-feather">Feather <output id="preview-brush-feather-value">0%</output></label>
                   <input id="preview-brush-feather" type="range" min="0" max="100" value="0" aria-label="Brush feather">
                 </div>
                 <label class="tool-checkbox" data-tooltip="Smooths edge pixels without adding feather. Turn off with Feather 0 for crisp pixel art."><input id="preview-brush-antialias" type="checkbox" checked> Anti-aliasing</label>
                 <label id="preview-square-brush-option" class="tool-checkbox"><input id="preview-square-brush" type="checkbox"> Square brush</label>
-                <div class="tool-actions">
+                <div id="preview-paint-actions" class="tool-actions">
                   <button id="preview-paint-apply" class="primary-button secondary-button" type="button" disabled>Apply Changes</button>
                   <button id="preview-paint-discard" class="secondary-button" type="button" disabled>Discard Changes</button>
                 </div>
@@ -239,6 +252,7 @@
                 <canvas id="preview-padding-canvas" aria-hidden="true" hidden></canvas>
                 <canvas id="preview-refine-canvas" aria-hidden="true" hidden></canvas>
                 <canvas id="preview-outline-canvas" aria-hidden="true" hidden></canvas>
+                <canvas id="preview-ignore-overlay" aria-hidden="true" hidden></canvas>
                 <div id="preview-crop-overlay" class="preview-crop-overlay" hidden>
                   <div class="crop-frame">
                     <span class="crop-handle north" data-crop-handle="n"></span>
@@ -264,6 +278,7 @@
             <button id="next-frame" class="transport-button" data-tooltip="Next frame (Right)" aria-label="Next frame"><span class="material-icon">chevron_right</span></button>
             <button id="next-image" class="transport-button" data-tooltip="Next image (Shift+Right)" aria-label="Next image"><span class="material-icon">skip_next</span></button>
             <button id="last-frame" class="transport-button" data-tooltip="Last frame (End)" aria-label="Last frame"><span class="material-icon">last_page</span></button>
+            <button id="loop-toggle" class="loop-toggle" type="button" aria-pressed="true" aria-label="Loop playback" data-tooltip="Loop playback is on"><span class="material-icon" aria-hidden="true">repeat</span></button>
           </div>
         </section>
         <div id="properties-panel-resizer" class="panel-resizer" role="separator" aria-label="Resize settings panel" aria-orientation="vertical" aria-valuemin="160" aria-valuemax="360" tabindex="0" data-tooltip="Drag to resize settings panel"></div>
@@ -271,19 +286,6 @@
         <aside class="properties-panel panel">
           <div class="panel-heading"><div><h1>Settings</h1></div></div>
           <div class="properties-content">
-            <div class="section-label">TIMELINE SELECTION</div>
-            <div id="selection-empty" class="selection-empty">Select a clip on the frame line to edit its timing.</div>
-            <div id="clip-properties" hidden>
-              <div id="clip-name" class="clip-name"></div>
-              <p id="selection-timing-hint" class="selection-timing-hint" hidden>Duration changes apply to every selected clip.</p>
-              <div class="clip-stat"><span>Start</span><strong id="clip-start">Frame 1</strong></div>
-              <div class="clip-stat"><span>End</span><strong id="clip-end">Frame 24</strong></div>
-              <label class="field-label" for="clip-frames">Frames <span>whole frames only</span></label>
-              <input id="clip-frames" type="number" min="1" step="1">
-              <label class="field-label" for="clip-seconds">Duration <span>seconds</span></label>
-              <input id="clip-seconds" type="number" min="0.001" step="0.01">
-            </div>
-            <div class="property-divider"></div>
             <label class="field-label" for="fps-select">Frame rate <strong id="fps-display">24 FPS</strong></label>
             <select id="fps-select">
               <option value="12">12 FPS</option><option value="15">15 FPS</option>
@@ -302,7 +304,6 @@
               <option value="4">4.00×</option><option value="8">8.00×</option>
               <option value="add">Add…</option>
             </select>
-            <button id="loop-toggle" class="loop-toggle" aria-pressed="true"><span><span class="material-icon" aria-hidden="true">repeat</span> LOOP</span><strong>ON</strong></button>
           </div>
         </aside>
       </section>
@@ -311,10 +312,21 @@
 
       <section class="timeline-panel panel">
         <div class="timeline-heading">
-          <div class="timeline-title"><h2>Frame line</h2><span id="fps-badge">24 FPS</span></div>
+          <div class="timeline-title"><h2>Frame line</h2><span id="fps-badge">24 FPS</span><button id="timeline-cleanup" type="button" class="timeline-cleanup-button" data-tooltip="Keep or remove frames using patterns, with a result preview"><span class="material-icon" aria-hidden="true">filter_alt</span> Frame cleanup</button></div>
           <div class="timeline-controls">
             <div class="frame-readout"><span>FRAME</span><strong id="frame-count">0 / 0</strong><span id="timecode">00:00.000</span></div>
             <div class="zoom-control"><button id="zoom-out" aria-label="Zoom out"><span class="material-icon">remove</span></button><input id="zoom-slider" type="range" min="1" max="5000" step="0.1" value="100" aria-label="Timeline zoom"><button id="zoom-in" aria-label="Zoom in"><span class="material-icon">add</span></button><strong id="zoom-label">100%</strong></div>
+          </div>
+          <div class="timeline-selection" aria-label="Timeline selection timing">
+            <div id="selection-empty" class="selection-empty">Select clips to change their frame duration.</div>
+            <div id="clip-properties" class="timeline-selection-properties" hidden>
+              <div id="clip-name" class="clip-name"></div>
+              <div class="clip-stat"><span>Start</span><strong id="clip-start">Frame 1</strong></div>
+              <div class="clip-stat"><span>End</span><strong id="clip-end">Frame 24</strong></div>
+              <label for="clip-frames">Frames<input id="clip-frames" type="number" min="1" step="1" data-tooltip="Set duration in whole frames for every selected clip"></label>
+              <label for="clip-seconds">Duration<input id="clip-seconds" type="number" min="0.001" step="0.01" data-tooltip="Set duration in seconds, rounded to whole frames"><span>s</span></label>
+              <p id="selection-timing-hint" class="selection-timing-hint" hidden>Duration applies to each selected clip.</p>
+            </div>
           </div>
         </div>
         <div id="timeline-scroll" class="timeline-scroll" tabindex="0" aria-label="Timeline">
@@ -358,6 +370,47 @@
         </footer>
       </section>
     </main>
+    <dialog id="timeline-cleanup-dialog" class="modal-dialog cleanup-dialog" aria-labelledby="cleanup-title">
+      <form id="timeline-cleanup-form" class="modal-content" novalidate>
+        <div class="modal-heading"><div><h2 id="cleanup-title">Frame cleanup</h2><p>Choose what stays on the frame line. Imported images are kept. Apply creates one undo step.</p></div><button id="cleanup-close" class="modal-close" type="button" aria-label="Cancel"><span class="material-icon" aria-hidden="true">close</span></button></div>
+        <div class="cleanup-settings">
+          <div class="cleanup-grid">
+            <label>Number by<select id="cleanup-unit"><option value="clips">Image clips (whole durations)</option><option value="frames">Timeline frames (including held frames)</option></select></label>
+            <label>Apply to<select id="cleanup-scope"><option value="all">Entire frame line</option><option value="range">Start–End playback range</option><option value="selected">Selected clips</option><option value="custom">Custom range</option></select></label>
+          </div>
+          <p id="cleanup-unit-help" class="cleanup-help"></p>
+          <div id="cleanup-range-fields" class="cleanup-grid" hidden><label>From<input id="cleanup-from" type="number" min="1" step="1" value="1"></label><label>Through<input id="cleanup-to" type="number" min="1" step="1" value="1"></label></div>
+          <div class="cleanup-grid">
+            <label>Action<select id="cleanup-action"><option value="keep">Keep matching positions</option><option value="remove">Remove matching positions</option></select></label>
+            <label>Pattern<select id="cleanup-mode"><option value="every">Every Nth position</option><option value="odd">Odd positions (1, 3, 5…)</option><option value="even">Even positions (2, 4, 6…)</option><option value="groups">Repeating keep / skip groups</option><option value="count">Evenly spaced target count</option><option value="percent">Evenly spaced percentage</option><option value="custom">Custom numbers and ranges</option></select></label>
+          </div>
+          <div class="cleanup-grid cleanup-pattern-fields">
+            <label id="cleanup-every-field">Every<input id="cleanup-every" type="number" min="1" step="1" value="5"></label>
+            <label id="cleanup-offset-field">Start matching at<input id="cleanup-offset" type="number" min="1" step="1" value="1"></label>
+            <label id="cleanup-keep-field" hidden>Match consecutive positions<input id="cleanup-keep" type="number" min="1" step="1" value="1"></label>
+            <label id="cleanup-skip-field" hidden>Then skip positions<input id="cleanup-skip" type="number" min="1" step="1" value="4"></label>
+            <label id="cleanup-count-field" hidden>Target count<input id="cleanup-count" type="number" min="1" step="1" value="10"></label>
+            <label id="cleanup-percent-field" hidden>Percentage to match<input id="cleanup-percent" type="number" min="0.1" max="100" step="0.1" value="50"></label>
+          </div>
+          <label id="cleanup-custom-field" class="cleanup-wide-field" hidden>Numbers and ranges<input id="cleanup-custom" type="text" value="1, 6, 11" placeholder="1, 5-12, 20-40:5"><small>Separate entries with commas. 20-40:5 matches 20, 25, 30, 35, 40.</small></label>
+          <div class="cleanup-grid">
+            <label id="cleanup-numbering-field">Pattern numbering<select id="cleanup-numbering"><option value="global">Original timeline positions</option><option value="scope">Restart at 1 within chosen scope</option></select></label>
+            <label>Result timing<select id="cleanup-timing"><option value="compact">Remove positions and close gaps</option><option value="hold">Keep original duration by holding kept images</option></select></label>
+          </div>
+          <div class="cleanup-checks"><label><input id="cleanup-keepFirst" type="checkbox"> Always keep first position</label><label><input id="cleanup-keepLast" type="checkbox"> Always keep last position</label></div>
+          <details class="cleanup-overrides"><summary>Manual exceptions</summary><p class="cleanup-help">Original position numbers within the chosen scope. Manual removal takes priority.</p><div class="cleanup-grid"><label>Also keep<input id="cleanup-include" type="text" placeholder="2, 8-10"></label><label>Also remove<input id="cleanup-exclude" type="text" placeholder="6, 15-20"></label></div><button id="cleanup-reset-overrides" type="button" class="secondary-button">Clear manual exceptions</button></details>
+        </div>
+        <section class="cleanup-result" aria-labelledby="cleanup-result-title">
+          <div class="cleanup-result-heading"><h3 id="cleanup-result-title">Result preview</h3><div class="cleanup-pager"><button id="cleanup-previous" type="button" aria-label="Previous result page"><span class="material-icon" aria-hidden="true">chevron_left</span></button><label>Page <input id="cleanup-page" type="number" min="1" value="1" aria-label="Result preview page"></label><span id="cleanup-pages"></span><button id="cleanup-next" type="button" aria-label="Next result page"><span class="material-icon" aria-hidden="true">chevron_right</span></button></div></div>
+          <p id="cleanup-summary" class="cleanup-help" role="status" aria-live="polite"></p>
+          <div id="cleanup-progress" class="cleanup-progress" role="status" hidden><span>Calculating result…</span><progress aria-label="Calculating frame cleanup preview"></progress></div>
+          <div id="cleanup-preview" class="cleanup-preview" aria-label="Images kept in original order"></div>
+          <p class="cleanup-help">Labels show original positions. Use × on a preview image to exclude that position.</p>
+        </section>
+        <div id="cleanup-error" class="modal-error" role="alert" hidden></div>
+        <div class="modal-actions"><button id="cleanup-cancel" class="secondary-button" type="button">Cancel</button><button id="cleanup-apply" class="primary-button" type="submit">Apply to frame line</button></div>
+      </form>
+    </dialog>
     <dialog id="rename-images-dialog" class="modal-dialog rename-dialog" aria-labelledby="rename-title">
       <form id="rename-images-form" class="modal-content" novalidate>
         <div class="modal-heading"><div><h2 id="rename-title">Rename images</h2><p>Preview names before renaming. Original files stay in place; source exports use these names.</p></div><button id="rename-close" class="modal-close" type="button" aria-label="Cancel"><span class="material-icon" aria-hidden="true">close</span></button></div>
@@ -657,6 +710,28 @@
         <progress id="operation-progress" aria-label="Operation progress"></progress>
         <output id="operation-progress-value"></output>
         <div class="modal-actions"><button id="operation-progress-cancel" class="secondary-button" type="button">Cancel export</button></div>
+      </div>
+    </dialog>
+    <dialog id="about-dialog" class="modal-dialog about-dialog" aria-labelledby="about-title">
+      <div class="modal-content">
+        <div class="modal-heading">
+          <h2 id="about-title">About FrameLine</h2>
+          <button class="icon-button" type="button" data-about-close aria-label="Close About"><span class="material-icon" aria-hidden="true">close</span></button>
+        </div>
+        <div class="about-brand">
+          <img src="../assets/icons/frameline-512.png" alt="" width="72" height="72">
+          <div><h3 data-app-info="name">FrameLine</h3><p data-app-info="description">An image-sequence editor for 2D animation.</p></div>
+        </div>
+        <dl class="about-details">
+          <div><dt>Version</dt><dd data-app-info="version">Loading…</dd></div>
+          <div><dt>Last update</dt><dd><time>Loading…</time></dd></div>
+          <div><dt>Author</dt><dd data-app-info="author">eManF</dd></div>
+          <div><dt>Email</dt><dd class="about-contact"><a data-app-link="email" href="mailto:emanf.cco@gmail.com">emanf.cco@gmail.com</a><button type="button" class="about-copy" data-app-copy="email" aria-label="Copy email address" data-tooltip="Copy email address"><span class="material-icon" aria-hidden="true">content_copy</span></button></dd></div>
+          <div><dt>Website</dt><dd class="about-contact"><a data-app-link="website" href="http://emanf.ir">http://emanf.ir</a><button type="button" class="about-copy" data-app-copy="website" aria-label="Copy website" data-tooltip="Copy website"><span class="material-icon" aria-hidden="true">content_copy</span></button></dd></div>
+          <div><dt>GitHub</dt><dd class="about-contact"><a data-app-link="github" href="https://github.com/emanf/FrameLine">https://github.com/emanf/FrameLine</a><button type="button" class="about-copy" data-app-copy="github" aria-label="Copy GitHub link" data-tooltip="Copy GitHub link"><span class="material-icon" aria-hidden="true">content_copy</span></button></dd></div>
+        </dl>
+        <div class="modal-error" role="alert" hidden></div>
+        <div class="modal-actions"><button type="button" class="primary-button secondary-button" data-about-close autofocus>Close</button></div>
       </div>
     </dialog>
     <div id="toast" role="status" aria-live="polite"></div>

@@ -1,5 +1,6 @@
 import { ControllerBase } from '../controller-base.mjs';
 import { cropPixelRect, cropFromPixelRect } from '../../model/crop-geometry.mjs';
+import {brushImagePoint} from '../../model/brush-geometry.mjs';
 
 /** Capture pointer gestures and coalesced samples for painting and panning. */
 export class BrushInputController extends ControllerBase {
@@ -13,22 +14,12 @@ export class BrushInputController extends ControllerBase {
     const samples = event.getCoalescedEvents?.() ?? [];
     // The dispatch event can include a final position beyond the coalesced list.
     for (const sample of [...samples, event]) {
-      const point = [Math.max(0, Math.min(1, (sample.clientX-bounds.left)/bounds.width)),
-        Math.max(0, Math.min(1, (sample.clientY-bounds.top)/bounds.height))];
+      const point = brushImagePoint(sample.clientX,sample.clientY,bounds,image.width,image.height,stroke.antiAlias === false);
       const last = stroke.points.at(-1);
       if (Math.hypot((point[0]-last[0])*image.width, (point[1]-last[1])*image.height) < .01) continue;
       stroke.points.push(point);
     }
-    if (stroke.points.length === runtime.paintRenderedPointCount) return;
-    const padding = stroke.size/2 + Math.ceil(stroke.size*(stroke.feather ?? 0)/100*3) + 3;
-    const region = {left:image.width, top:image.height, right:0, bottom:0};
-    for (const [x,y] of stroke.points.slice(Math.max(0,runtime.paintRenderedPointCount-1))) {
-      region.left = Math.max(0, Math.min(region.left, Math.floor(x*image.width-padding)));
-      region.top = Math.max(0, Math.min(region.top, Math.floor(y*image.height-padding)));
-      region.right = Math.min(image.width, Math.max(region.right, Math.ceil(x*image.width+padding)));
-      region.bottom = Math.min(image.height, Math.max(region.bottom, Math.ceil(y*image.height+padding)));
-    }
-    runtime.paintDirtyRegion = region;
+
   }
 
   /** Promote completed paint gestures to persistent strokes with one undo step per gesture. */
@@ -84,10 +75,8 @@ export class BrushInputController extends ControllerBase {
         if (!image) return;
         const bounds = runtime.previewImageWrap.getBoundingClientRect();
         if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) return;
-        const point = [
-          Math.max(0, Math.min(1, (event.clientX - bounds.left) / bounds.width)),
-          Math.max(0, Math.min(1, (event.clientY - bounds.top) / bounds.height))
-        ];
+        const point = brushImagePoint(event.clientX,event.clientY,bounds,image.width,image.height,
+          !document.querySelector('#preview-brush-antialias').checked);
         const stroke = {
           tool: runtime.previewTool,
           color: runtime.foregroundColor,
@@ -98,6 +87,7 @@ export class BrushInputController extends ControllerBase {
           antiAlias: document.querySelector("#preview-brush-antialias").checked,
           points: [point]
         };
+        if(image.ignoreEnabled !== false && image.ignoreStrokes?.length) stroke.ignoreStrokes=structuredClone(image.ignoreStrokes);
         if (runtime.previewTool === "healing") {
           stroke.color = document.querySelector("#preview-healing-keep").value;
           stroke.autoKeep = document.querySelector("#preview-healing-auto-keep").checked;
@@ -117,6 +107,7 @@ export class BrushInputController extends ControllerBase {
         runtime.previewStage.setPointerCapture(event.pointerId);
         runtime.previewStage.focus({preventScroll:true});
         runtime.redrawPaintCanvas(image);
+        runtime.updateBrushCursor(event.clientX,event.clientY);
         return;
       }
       if (runtime.previewTool !== "hand") return;
@@ -130,7 +121,7 @@ export class BrushInputController extends ControllerBase {
     runtime.previewStage.addEventListener("wheel", (event) => {
       if (runtime.previewImageWrap.hidden) return;
       event.preventDefault();
-      if (event.altKey && ['brush', 'eraser', 'healing'].includes(runtime.previewTool)) {
+      if (event.altKey && ['brush', 'eraser', 'healing','ignore','recover'].includes(runtime.previewTool)) {
         if (!event.deltaY) return;
         const field = document.querySelector('#preview-brush-size');
         const delta = event.deltaY * (event.deltaMode === WheelEvent.DOM_DELTA_LINE ? 16 : event.deltaMode === WheelEvent.DOM_DELTA_PAGE ? runtime.previewStage.clientHeight : 1);
@@ -211,6 +202,7 @@ export class BrushInputController extends ControllerBase {
         runtime.previewPaintFrame = null;
         runtime.previewPaintPointerId = null;
         runtime.previewPaintStroke = null;
+        runtime.clearActivePaintRaster();
         if (event.type !== "pointercancel") {
           runtime.previewPaintDraft ??= runtime.createPreviewDraft(runtime.currentPreviewImage(), { strokes: [] });
           runtime.previewPaintDraft.strokes = [...runtime.previewPaintDraft.strokes, stroke];
@@ -227,6 +219,7 @@ export class BrushInputController extends ControllerBase {
         runtime.redrawPaintCanvas(runtime.currentPreviewImage());
         runtime.paintPointerBounds = null;
         runtime.paintDirtyRegion = null;
+        runtime.updateBrushCursor(event.clientX,event.clientY);
         return;
       }
       if (event.pointerId !== runtime.previewPanPointerId) return;

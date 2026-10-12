@@ -9,6 +9,8 @@ import { HandTool } from './hand.mjs';
 import { BrushTool } from './brush.mjs';
 import { ColorCleanupTool } from './healing.mjs';
 import { EraserTool } from './eraser.mjs';
+import {IgnoreTool} from './ignore.mjs';
+import {RecoverTool} from './recover.mjs';
 
 /** Built-in tools use the same registration contract as installed plugins. */
-export const builtinToolClasses = [ClearTool, BackgroundTool, CropTool, OutlineTool, PaddingTool, RefineEdgesTool, CleanPixelsTool, HandTool, BrushTool, ColorCleanupTool, EraserTool];
+export const builtinToolClasses = [ClearTool, BackgroundTool, CropTool, OutlineTool, PaddingTool, RefineEdgesTool, CleanPixelsTool, HandTool, BrushTool, ColorCleanupTool, EraserTool,IgnoreTool,RecoverTool];

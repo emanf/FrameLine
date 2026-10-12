@@ -1,8 +1,10 @@
 import { pixelRoundStrokeSpans } from './pixel-brush.mjs';
+import {protectionMask} from './protection-mask.mjs';
+import {scanSmoothBrush,BRUSH_SAMPLE_SCALE} from './brush-spans.mjs';
 
 // Eight samples per axis give edge coverage without a blur or a bright halo.
 // Keep this scan converter and the feather filter in sync with brush_mask.py.
-const SCALE = 8;
+const SCALE = BRUSH_SAMPLE_SCALE;
 
 export function brushMask(stroke, imageWidth, imageHeight, region = null) {
   const sigma = stroke.size * (stroke.feather ?? 0) / 100;
@@ -33,60 +35,10 @@ export function brushMask(stroke, imageWidth, imageHeight, region = null) {
     }
   } else {
     const rows = new Map();
-    const addSpan = (y, start, end) => {
-      const a = Math.max(0, Math.ceil((start - left) * SCALE - .5));
-      const b = Math.min(width * SCALE, Math.ceil((end - left) * SCALE - .5));
-      if (a >= b) return;
-      const intervals = rows.get(y) ?? [];
-      intervals.push([a, b]); rows.set(y, intervals);
-    };
-    const radius = stroke.size / 2;
-    const addCircle = (cx, cy) => {
-      if (cx + radius < left || cx - radius > right || cy + radius < top || cy - radius > bottom) return;
-      const first = Math.max(0, Math.ceil((cy - radius - top) * SCALE - .5));
-      const last = Math.min(height * SCALE, Math.ceil((cy + radius - top) * SCALE - .5));
-      for (let row = first; row < last; row++) {
-        const dy = top + (row + .5) / SCALE - cy;
-        const dx = Math.sqrt(Math.max(0, radius * radius - dy * dy));
-        addSpan(row, cx - dx, cx + dx);
-      }
-    };
-    const addPolygon = vertices => {
-      if (Math.max(...vertices.map(p => p[0])) < left || Math.min(...vertices.map(p => p[0])) > right) return;
-      const first = Math.max(0, Math.ceil((Math.min(...vertices.map(p => p[1])) - top) * SCALE - .5));
-      const last = Math.min(height * SCALE, Math.ceil((Math.max(...vertices.map(p => p[1])) - top) * SCALE - .5));
-      for (let row = first; row < last; row++) {
-        const y = top + (row + .5) / SCALE;
-        const intersections = [];
-        for (let i = 0; i < vertices.length; i++) {
-          const a = vertices[i], b = vertices[(i + 1) % vertices.length];
-          if ((a[1] <= y && b[1] > y) || (b[1] <= y && a[1] > y)) {
-            intersections.push(a[0] + (y - a[1]) * (b[0] - a[0]) / (b[1] - a[1]));
-          }
-        }
-        if (intersections.length) addSpan(row, Math.min(...intersections), Math.max(...intersections));
-      }
-    };
-    for (let i = 0; i < points.length; i++) {
-      const [x, y] = points[i];
-      if (stroke.shape === 'square') {
-        addPolygon([[x-radius,y-radius],[x+radius,y-radius],[x+radius,y+radius],[x-radius,y+radius]]);
-      } else addCircle(x, y);
-      if (!i) continue;
-      const [px, py] = points[i - 1], dx = x - px, dy = y - py;
-      if (!dx && !dy) continue;
-      if (stroke.shape === 'square') {
-        // Sweeping an axis-aligned square: join its four corresponding edges.
-        const corners = [[-radius,-radius],[radius,-radius],[radius,radius],[-radius,radius]];
-        for (let c = 0; c < 4; c++) {
-          const a = corners[c], b = corners[(c + 1) % 4];
-          addPolygon([[px+a[0],py+a[1]],[px+b[0],py+b[1]],[x+b[0],y+b[1]],[x+a[0],y+a[1]]]);
-        }
-      } else {
-        const length = Math.hypot(dx, dy), ox = -dy * radius / length, oy = dx * radius / length;
-        addPolygon([[px+ox,py+oy],[x+ox,y+oy],[x-ox,y-oy],[px-ox,py-oy]]);
-      }
-    }
+    scanSmoothBrush(stroke,imageWidth,imageHeight,{left,top,right,bottom},(row,a,b)=>{
+      const intervals=rows.get(row-top*SCALE) ?? [];
+      intervals.push([a-left*SCALE,b-left*SCALE]);rows.set(row-top*SCALE,intervals);
+    });
     for (const [row, intervals] of rows) {
       intervals.sort((a,b) => a[0]-b[0]);
       const merged = [];
@@ -103,6 +55,17 @@ export function brushMask(stroke, imageWidth, imageHeight, region = null) {
       }
     }
   }
+  values = featherBrushValues(values,width,height,sigma);
+  const data=Uint8ClampedArray.from(values,value=>Math.max(0,Math.min(255,Math.floor(value+.5))));
+  if(stroke.ignoreStrokes?.length) {
+    const ignored=protectionMask(stroke.ignoreStrokes,imageWidth,imageHeight,{left,top,right,bottom});
+    for(let i=0;i<data.length;i++) data[i]=Math.round(data[i]*(255-ignored.data[i])/255);
+  }
+  return {left,top,width,height,data};
+}
+
+/** Apply the same separable feather filter to full masks and cached regional coverage. */
+export function featherBrushValues(values,width,height,sigma) {
   if (sigma) {
     // Three box filters approximate a Gaussian in linear time, independent of
     // brush radius. Transparent samples beyond the image prevent edge smearing.
@@ -118,7 +81,7 @@ export function brushMask(stroke, imageWidth, imageHeight, region = null) {
       }
     }
   }
-  return {left, top, width, height, data:Uint8ClampedArray.from(values, value => Math.max(0, Math.min(255, Math.floor(value + .5))))};
+  return values;
 }
 
 function boxBlur(values, width, height, radius, vertical) {

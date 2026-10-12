@@ -1,4 +1,5 @@
 import { ControllerBase } from '../controller-base.mjs';
+import {workingIgnoreStrokes} from '../../model/image-protection.mjs';
 
 
 /** Apply background removal to current edited images with batch history. */
@@ -33,7 +34,7 @@ export class BackgroundToolController extends ControllerBase {
         const input = target.id === image.id ? currentResult : await runtime.materializeWorkingImage(structuredClone(target));
         try {
           progress.update(index, `Processing ${target.name}…`);
-          const result = await runtime.runImageRequest('removeBackground', {...selection.options,path:input.path}, event => {
+          const result = await runtime.runImageRequest('removeBackground', {...selection.options,path:input.path,effect_ignore:workingIgnoreStrokes(target)}, event => {
             progress.update(index + event.current / event.total, event.message);
           });
           results.push({...result,imageId:target.id});

@@ -1,4 +1,5 @@
-import { validateCrop, validateStroke, validateOutline } from '../../model/project-model.mjs';
+import { validateCrop, validateStroke, validateOutline,validateIgnoreStrokes } from '../../model/project-model.mjs';
+import {workingGeometry,protectedCrop} from '../../model/image-protection.mjs';
 import { originalImage, preserveOriginal, rebaseImageEdits, workingImageRequest, clearPendingEffects, hasImageEdits } from "../../model/image-effects.mjs";
 
 const copy = value => JSON.parse(JSON.stringify(value));
@@ -6,6 +7,25 @@ const copy = value => JSON.parse(JSON.stringify(value));
 /** Apply non-destructive image edits and retain originals across working-image replacements. */
 export class ImageEffectsCommands {
   constructor(viewModel) { this.viewModel = viewModel; }
+
+  /** Record one Ignore brush gesture or clear the active image's protection marks. */
+  addIgnoreStroke(imageId,stroke) {
+    validateIgnoreStrokes([stroke]);
+    const image=this.viewModel.project.images.find(item=>item.id===imageId);
+    if(!image) return false;
+    this.viewModel.record(); image.ignoreStrokes ??=[]; image.ignoreStrokes.push(copy(stroke));
+    image.ignoreEnabled=true; this.viewModel.notify(); return true;
+  }
+
+  /** Enable, disable, or clear saved protection with one reversible edit. */
+  setIgnoreState(imageId,enabled,clear=false) {
+    const image=this.viewModel.project.images.find(item=>item.id===imageId);
+    if(!image?.ignoreStrokes?.length || !clear && (image.ignoreEnabled !== false)===enabled) return false;
+    this.viewModel.record();
+    if(clear) {delete image.ignoreStrokes;delete image.ignoreEnabled;}
+    else image.ignoreEnabled=Boolean(enabled);
+    this.viewModel.notify(); return true;
+  }
 
   /** Commit one validated brush stroke through the shared stroke command. */
   addPaintStroke(imageId, stroke) {
@@ -48,11 +68,13 @@ export class ImageEffectsCommands {
     }
     this.viewModel.record();
     preserveOriginal(image);
+    const geometry=workingGeometry(image);
     if (options) image.sourcePath = original.path;
     else delete image.sourcePath;
     clearPendingEffects(image);
-    image.width = result.width ?? currentResult?.width ?? image.width;
-    image.height = result.height ?? currentResult?.height ?? image.height;
+    const width=result.width ?? currentResult?.width ?? image.width,height=result.height ?? currentResult?.height ?? image.height;
+    if(options) rebaseImageEdits(image,width,height,{x:geometry.x+Math.floor((width-geometry.width)/2),y:geometry.y+Math.floor((height-geometry.height)/2)});
+    else {image.width=width;image.height=height;delete image.ignoreStrokes;delete image.ignoreEnabled;delete image.originalOffset;}
     image.path = result.path;
     this.viewModel.notify();
     return true;
@@ -82,6 +104,7 @@ export class ImageEffectsCommands {
       delete image.paintStrokes;
       delete image.crop;
       delete image.outline;
+      delete image.ignoreStrokes;delete image.ignoreEnabled;delete image.originalOffset;
     }
     this.viewModel.notify();
     return true;
@@ -103,12 +126,21 @@ export class ImageEffectsCommands {
         || !Number.isSafeInteger(result.height) || result.height < 1)) {
       throw new Error("Invalid processed image results.");
     }
+    for(const result of results) {
+      validateCrop(result.crop);validateOutline(result.outline);
+      if(result.sourceOffset && (!Number.isFinite(result.sourceOffset.x) || !Number.isFinite(result.sourceOffset.y))) throw new Error('Invalid processed image alignment.');
+    }
     this.viewModel.record();
     results.forEach((result, index) => {
       const image = targets[index];
       preserveOriginal(image);
+      const geometry=workingGeometry(image);
+      const translation=result.sourceOffset ?? {x:geometry.x+Math.floor((result.width-geometry.width)/2),y:geometry.y+Math.floor((result.height-geometry.height)/2)};
       if (backgroundRemoval) image.sourcePath = originalImage(image).path;
       clearPendingEffects(image);
+      rebaseImageEdits(image,result.width,result.height,translation);
+      if(result.crop) image.crop=copy(result.crop);
+      if(result.outline) image.outline=copy(result.outline);
       image.path = result.path;
       image.width = result.width;
       image.height = result.height;
@@ -125,7 +157,7 @@ export class ImageEffectsCommands {
     validResults.forEach(({ outline }) => validateOutline(outline));
     if (record) this.viewModel.record();
     else this.viewModel.editRevision += 1;
-    for (const { imageId, path, width, height, outline, basePath, baseDimensions, bakedEdits } of validResults) {
+    for (const { imageId, path, width, height, outline, basePath, baseDimensions, bakedEdits,sourceOffset } of validResults) {
       const image = this.viewModel.project.images.find((item) => item.id === imageId);
       preserveOriginal(image);
       if (bakedEdits) clearPendingEffects(image);
@@ -138,7 +170,7 @@ export class ImageEffectsCommands {
         image.outlineSourceDimensions = { width: image.width, height: image.height };
       }
       image.path = path;
-      rebaseImageEdits(image, width, height);
+      rebaseImageEdits(image, width, height,sourceOffset);
       image.outlineSettings = copy(outline);
       delete image.outline;
     }
@@ -177,7 +209,7 @@ export class ImageEffectsCommands {
     if (targets.every((target) => JSON.stringify(target.crop) === JSON.stringify(nextCrop))) return false;
     this.viewModel.record();
     for (const target of targets) {
-      if (nextCrop) target.crop = copy(nextCrop);
+      if (nextCrop) target.crop = protectedCrop(target,copy(nextCrop));
       else delete target.crop;
     }
     this.viewModel.notify();

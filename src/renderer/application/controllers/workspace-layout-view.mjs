@@ -68,7 +68,13 @@ export class WorkspaceLayoutView extends ControllerBase {
       setSize(currentSize() + delta);
       runtime.scheduleSavePreferences();
     });
-    setSize(currentSize());
+    if (panel !== 'timeline' || root.style.getPropertyValue('--timeline-height')) setSize(currentSize());
+    if (panel === 'timeline') {
+      // Keep the initial panel at its content height until the user chooses a fixed size.
+      const observer = new ResizeObserver(() => handle.setAttribute('aria-valuenow',String(Math.round(currentSize()))));
+      observer.observe(document.querySelector('.timeline-panel'));
+      window.addEventListener('beforeunload',() => observer.disconnect(),{once:true});
+    }
   }
 
   /** Bind layout resizers after the editor state and required controls are ready. */

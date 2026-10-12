@@ -2,6 +2,7 @@ import { ControllerBase } from '../controller-base.mjs';
 import { healPixelData } from '../../model/healing-brush.mjs';
 import { brushMask } from '../../model/brush-mask.mjs';
 import { pixelRoundStrokeSpans } from '../../model/pixel-brush.mjs';
+import {IncrementalBrushMask} from '../../model/incremental-brush-mask.mjs';
 
 /** Render incremental brush masks and color cleanup strokes into preview canvases. */
 export class BrushRasterView extends ControllerBase {
@@ -21,41 +22,47 @@ export class BrushRasterView extends ControllerBase {
       reference:{data:reference.data, width:reference.width, height:reference.height, left:left-x, top:top-y}});
   }
 
+  /** Blend a prepared regional mask once against the immutable completed paint raster. */
+  drawPaintMask(context,stroke,mask,region=null) {
+    const runtime=this.application;
+    if(!mask) return;
+    if (!mask.width || !mask.height) return;
+    const layer = this.paintLayer ??= document.createElement('canvas');
+    if(layer.width!==mask.width || layer.height!==mask.height) {layer.width=mask.width;layer.height=mask.height;}
+    const layerContext = layer.getContext('2d');
+    const pixels = layerContext.createImageData(mask.width, mask.height);
+    const color = stroke.tool === 'eraser' ? [255,255,255]
+      : [1,3,5].map(index => parseInt(stroke.color.slice(index,index+2),16));
+    for (let i = 0; i < mask.data.length; i++) {
+      const offset=i*4;pixels.data[offset]=color[0];pixels.data[offset+1]=color[1];pixels.data[offset+2]=color[2];
+      pixels.data[i*4+3] = stroke.tool === 'brush' ? Math.floor(mask.data[i]*stroke.opacity+.5) : mask.data[i];
+    }
+    if (stroke.tool === 'healing') {
+      const source = context.getImageData(mask.left, mask.top, mask.width, mask.height);
+      runtime.applyHealingPixels(context, source, pixels, stroke, mask.left, mask.top);
+      if (region) context.putImageData(source, mask.left, mask.top, region.left-mask.left, region.top-mask.top,
+        region.right-region.left, region.bottom-region.top);
+      else context.putImageData(source, mask.left, mask.top);
+    } else {
+      layerContext.putImageData(pixels, 0, 0);
+      context.save();
+      if (region) {
+        context.beginPath(); context.rect(region.left, region.top, region.right-region.left, region.bottom-region.top);
+        context.clip();
+      }
+      context.globalAlpha = 1; context.filter = 'none';
+      context.globalCompositeOperation = stroke.tool === 'eraser' ? 'destination-out' : 'source-over';
+      context.drawImage(layer, mask.left, mask.top);
+      context.restore();
+    }
+  }
+
   /** Rasterize a stroke mask and blend the selected painting operation. */
   drawPaintStroke(context, stroke, width, height, region = null) {
     const runtime = this.application;
     if (!stroke.points.length) return;
     if (typeof stroke.antiAlias === 'boolean') {
-      const mask = brushMask(stroke, width, height, region);
-      if (!mask.width || !mask.height) return;
-      const layer = document.createElement('canvas');
-      layer.width = mask.width; layer.height = mask.height;
-      const layerContext = layer.getContext('2d');
-      const pixels = layerContext.createImageData(mask.width, mask.height);
-      const color = stroke.tool === 'eraser' ? [255,255,255]
-        : [1,3,5].map(index => parseInt(stroke.color.slice(index,index+2),16));
-      for (let i = 0; i < mask.data.length; i++) {
-        pixels.data.set(color, i*4);
-        pixels.data[i*4+3] = stroke.tool === 'brush' ? Math.floor(mask.data[i]*stroke.opacity+.5) : mask.data[i];
-      }
-      if (stroke.tool === 'healing') {
-        const source = context.getImageData(mask.left, mask.top, mask.width, mask.height);
-        runtime.applyHealingPixels(context, source, pixels, stroke, mask.left, mask.top);
-        if (region) context.putImageData(source, mask.left, mask.top, region.left-mask.left, region.top-mask.top,
-          region.right-region.left, region.bottom-region.top);
-        else context.putImageData(source, mask.left, mask.top);
-      } else {
-        layerContext.putImageData(pixels, 0, 0);
-        context.save();
-        if (region) {
-          context.beginPath(); context.rect(region.left, region.top, region.right-region.left, region.bottom-region.top);
-          context.clip();
-        }
-        context.globalAlpha = 1; context.filter = 'none';
-        context.globalCompositeOperation = stroke.tool === 'eraser' ? 'destination-out' : 'source-over';
-        context.drawImage(layer, mask.left, mask.top);
-        context.restore();
-      }
+      runtime.drawPaintMask(context,stroke,brushMask(stroke,width,height,region),region);
       return;
     }
   
@@ -151,7 +158,7 @@ export class BrushRasterView extends ControllerBase {
     if (!canAppend) {
       const canvas = document.createElement('canvas');
       canvas.width = image.width; canvas.height = image.height;
-      const context = canvas.getContext('2d');
+      const context = canvas.getContext('2d',{willReadFrequently:true});
       if (erasesImage && source) context.drawImage(source, 0, 0, image.width, image.height);
       runtime.paintRasterCache = {canvas, context, path:image.path, width:image.width, height:image.height, source, erasesImage, strokes:[]};
     }
@@ -162,17 +169,37 @@ export class BrushRasterView extends ControllerBase {
     return runtime.paintRasterCache.canvas;
   }
 
-  /** Repaint the dirty region with the current stroke and preserve its exact release result. */
+  /** Reuse subpixel coverage for the active gesture, accepting only new pointer samples. */
+  activePaintMask(image) {
+    const stroke=this.application.previewPaintStroke?.stroke;
+    if(!stroke) return null;
+    if(this.activeRaster?.stroke!==stroke || this.activeRaster.width!==image.width || this.activeRaster.height!==image.height) {
+      this.activeRaster=new IncrementalBrushMask(stroke,image.width,image.height);
+    }
+    this.activeRaster.append();return this.activeRaster;
+  }
+
+  /** Release gesture tiles after completion or cancellation; committed strokes retain their vector data. */
+  clearActivePaintRaster() { this.activeRaster=null; }
+
+  /** Reconstruct the active display after an explicit canvas reset without rescanning its path. */
+  drawActivePaintStroke(context,image) {
+    const raster=this.activePaintMask(image);
+    if(!raster) return;
+    this.application.drawPaintMask(context,raster.stroke,raster.mask());raster.dirty=null;
+  }
+
+  /** Repaint only changed coverage and preserve the same union on mouse release. */
   repaintActiveStroke() {
-    const runtime = this.application;
-    const image = runtime.currentPreviewImage();
-    if (!image || !runtime.previewPaintStroke || !runtime.paintRasterCache || !runtime.paintDirtyRegion) return;
-    const region = runtime.paintDirtyRegion;
-    runtime.paintDirtyRegion = null;
-    runtime.previewPaintContext.clearRect(region.left, region.top, region.right-region.left, region.bottom-region.top);
-    runtime.previewPaintContext.drawImage(runtime.paintRasterCache.canvas, region.left, region.top, region.right-region.left, region.bottom-region.top,
-      region.left, region.top, region.right-region.left, region.bottom-region.top);
-    runtime.drawPaintStroke(runtime.previewPaintContext, runtime.previewPaintStroke.stroke, image.width, image.height, region);
-    runtime.paintRenderedPointCount = runtime.previewPaintStroke.stroke.points.length;
+    const runtime = this.application,image=runtime.currentPreviewImage();
+    if(!image || !runtime.previewPaintStroke || !runtime.paintRasterCache) return;
+    const raster=this.activePaintMask(image),mask=raster.takeDirtyMask();
+    if(mask) {
+      runtime.previewPaintContext.clearRect(mask.left,mask.top,mask.width,mask.height);
+      runtime.previewPaintContext.drawImage(runtime.paintRasterCache.canvas,mask.left,mask.top,mask.width,mask.height,
+        mask.left,mask.top,mask.width,mask.height);
+      runtime.drawPaintMask(runtime.previewPaintContext,raster.stroke,mask);
+    }
+    runtime.paintRenderedPointCount=runtime.previewPaintStroke.stroke.points.length;runtime.paintDirtyRegion=null;
   }
 }

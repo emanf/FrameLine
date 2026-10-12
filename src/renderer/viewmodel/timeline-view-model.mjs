@@ -228,6 +228,9 @@ export class TimelineViewModel {
   /** @see TimelineCommands.insertImage */
   insertImage(imageId, frame) { return this.timelineCommands.insertImage(imageId, frame); }
 
+  /** @see TimelineCommands.cleanupTimeline */
+  cleanupTimeline(options, selectedIds, expectedRevision, preparedPlan) { return this.timelineCommands.cleanupTimeline(options, selectedIds, expectedRevision, preparedPlan); }
+
   /** @see TimelineCommands.insertClipsAtFrame */
   insertClipsAtFrame(added, frame) { return this.timelineCommands.insertClipsAtFrame(added, frame); }
 
@@ -245,6 +248,9 @@ export class TimelineViewModel {
 
   /** @see TimelineCommands.moveSelectionToEdge */
   moveSelectionToEdge(toEnd) { return this.timelineCommands.moveSelectionToEdge(toEnd); }
+
+  /** @see TimelineCommands.reverseSelected */
+  reverseSelected() { return this.timelineCommands.reverseSelected(); }
 
   /** @see TimelineCommands.resizeSelectedClips */
   resizeSelectedClips(frames) { return this.timelineCommands.resizeSelectedClips(frames); }
@@ -377,4 +383,10 @@ export class TimelineViewModel {
 
   /** @see ProjectSettingsCommands.replaceProject */
   replaceProject(candidate) { return this.projectSettingsCommands.replaceProject(candidate); }
+
+  /** @see ImageEffectsCommands.addIgnoreStroke */
+  addIgnoreStroke(imageId,stroke) {return this.imageEffectsCommands.addIgnoreStroke(imageId,stroke);}
+
+  /** @see ImageEffectsCommands.setIgnoreState */
+  setIgnoreState(imageId,enabled,clear=false) {return this.imageEffectsCommands.setIgnoreState(imageId,enabled,clear);}
 }

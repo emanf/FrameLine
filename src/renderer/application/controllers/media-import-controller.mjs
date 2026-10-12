@@ -75,8 +75,8 @@ export class MediaImportController extends ControllerBase {
     try {
       const choice = await runtime.requestMessage({ title: "Add Images", message: "Import images or video, or create empty images to draw on.", actions: [
         { label: "Cancel", value: "cancel" },
-        { label: "Import media", value: "import", primary: true },
-        { label: "Create empty images", value: "create" }
+        { label: "Create Empty Images", value: "create" },
+        { label: "Import media", value: "import", primary: true }
       ] });
       if (choice.action === "import") await runtime.chooseAndImport();
       else if (choice.action === "create") await runtime.createEmptyImages();

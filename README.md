@@ -1,8 +1,10 @@
 <p align="center">
-  <img src="docs/images/screenshot.png" alt="FrameLine application screenshot placeholder" width="800">
+  <img src="docs/images/screenshot.png" alt="FrameLine animation editor" width="800">
 </p>
 
 # FrameLine
+
+Version **1.1.0** · [Release notes](CHANGELOG.md)
 
 FrameLine turns videos and image sequences into usable animation assets: extract PNG frames, remove backgrounds, clean up edges, and keep only the frames you need.
 
@@ -36,16 +38,17 @@ On Windows, you can also use `run.bat` to check dependencies and launch the app.
 
 ## Features and usage
 
-- **Media import:** Import common image and video formats. Extract video frames at the project FPS, a time interval, or a fixed image count.
+- **Media import:** Import common image and video formats, including SVG and AVIF. Extract video frames at the project FPS, a time interval, or a fixed image count.
 - **Blank images:** Create batches with preset or custom dimensions and transparent or solid backgrounds. Existing artwork can supply dimensions and a background color sampled from its corners.
 - **Batch rename:** Rename all or selected images with numbered sequences or patterns such as `Run_{number}{ext}`. Set number padding, start, increment, order, and duplicate handling; source exports use the resulting names.
-- **Frame-based timeline:** Reorder clips, resize durations in whole frames, and move or adjust multiple clips together. Right-click to delete frames before or after a clip while retaining the imported images.
+- **Frame-based timeline:** Reorder clips, resize durations in whole frames, and move or adjust multiple clips together. Right-click to reverse selected clips or delete frames before or after a clip while retaining the imported images.
+- **Frame cleanup:** Preview every-Nth, odd/even, repeating keep/skip, target-count, percentage, or custom-range patterns before applying. Work with whole clips or individual playback frames, limit cleanup to a range or selection, add manual exceptions, and choose shorter timing or held images that preserve the original duration. Undo restores the complete timeline.
 - **Playback range:** Drag Start and End to define a loop. Set custom FPS and playback speed without changing clip durations.
 - **Preview:** Keep zoom and pan across frames, move beyond image boundaries, and inspect transparency against a checkerboard or chosen color. An adjustable grid helps with alignment.
 - **Crop, Outline, and Padding:** Enter exact crop coordinates, add inside/center/outside outlines, or add transparent padding with independent or linked sides. Supported edits can apply to one image or the whole batch.
-- **Brush and Eraser:** Use adjustable size, opacity, feather, and round or square brush shapes. Disable anti-aliasing with zero feather for crisp pixel art.
+- **Ignore and Recover brushes:** Paint protected areas that effects leave unchanged, or restore individual areas from the imported original. Both support size, anti-aliasing, round/square shapes, Alt + wheel resizing, and one Undo step per stroke. Ignore marks are saved with the project. The eye button beside Preview Background hides the red overlay while keeping protection active; the overlay stays out of exports. The removal window also has a batch protection brush. Crop keeps protected areas inside its bounds.
+- **Brush and Eraser:** Adjust size and feather; Brush also provides opacity and round or square shapes. Long strokes update incrementally. Disable anti-aliasing with zero feather for crisp pixel art.
 - **Remove Background:** Detect background colors automatically or choose a custom color. Aggressive removal targets enclosed matches; chroma key and sampled-color modes offer more control. Adjust edge smoothing, blur, tint, spill suppression, and edge color cleanup.
-- **Ignore Brush:** Paint protected areas in the removal window to preserve their colors and transparency. Protection marks also work across image batches.
 - **Color Cleanup Brush:** Replace unwanted color mixtures and recover transparency with Keep/Remove colors or local automatic detection. Auto Keep nearby colors preserves hair, highlights, and shadows, with adjustable sampling distance and opacity recovery.
 - **Refine Edges:** Repair white or colored fringes, clean transparency, smooth boundaries, and optionally shrink edges while preserving nearby foreground colors.
 - **Clean Pixels:** Reduce noise and uneven colors across the whole image, including colorful artwork. Preview cleanup strength, color tolerance, radius, and isolated speckle removal, then apply to one image or all images. Transparency stays unchanged.
@@ -69,7 +72,7 @@ On Windows, you can also use `run.bat` to check dependencies and launch the app.
 | Ctrl + Z | Undo |
 | Ctrl + Y or Ctrl + Shift + Z | Redo |
 | Ctrl + S | Save the project |
-| Alt + mouse wheel | Resize Brush, Eraser, Color Cleanup Brush, or an active Ignore Brush |
+| Alt + mouse wheel | Resize Brush, Eraser, Color Cleanup, Ignore, or Recover |
 | F11 | Toggle full screen |
 
 Command can replace Ctrl for keyboard commands on macOS. Editing shortcuts are inactive while typing or using a dialog.
@@ -98,6 +101,8 @@ The app uses Electron and Node.js for desktop integration, vanilla JavaScript ES
 
 Package standalone apps with `python scripts/build.py`. See [Building and platform support](docs/building.md) for setup, separate architecture folders, and the owner-only manual workflow that uploads packages to your latest release.
 
+For editing steps and the current toolbox layout, see the [User guide](docs/user-guide.md).
+
 Developer guides: [Architecture](docs/architecture.md), [Plugin development](docs/plugin-development.md), [Tool API](docs/tool-api.md), and [Contributing](docs/contributing.md). A complete [Invert Colors extension](docs/examples/invert-colors) demonstrates the installation and processing contract.
 
 Run the checks from the repository folder:
@@ -106,7 +111,12 @@ Run the checks from the repository folder:
 npm test
 npm run test:backend
 npm run test:ui
+npm run test:timeline
 npm run test:main
 ```
 
-These cover model/editing behavior, image and export processing, UI workflows, and production Electron/Python integration. For effect timings and output-pixel hashes, run `python scripts/benchmark-effects.py`.
+These cover model/editing behavior, image and export processing, UI workflows, and production Electron/Python integration. For effect timings and output-pixel hashes, run `python scripts/benchmark-effects.py`. Compare long-stroke coverage timings with `node scripts/benchmark-brush.mjs`.
+
+## Author
+
+Created by [eManF](http://emanf.ir). Contact [emanf.cco@gmail.com](mailto:emanf.cco@gmail.com). The About window shows the installed version, update date, and contact links with copy buttons.

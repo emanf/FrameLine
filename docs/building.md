@@ -97,6 +97,10 @@ On a personal fork, the owner check follows the fork's repository owner, and upl
 
 ## Distribution and extensions
 
+About uses Electron's installed package version in release builds and the root `package.json` version in a source checkout. Keep that version and both root version entries in `package-lock.json` in sync. Author details and release date come from `src/shared/app-info.json`; update `lastUpdated` when preparing a release. It describes the app update rather than the file's extraction or installation date. The app version is separate from the project format and plugin API versions.
+
+Record release changes in `CHANGELOG.md` and update the version shown in the README. Commit those files together with the source and tests before creating the release tag. The manual workflow builds the commit referenced by the latest stable release's tag, so a new local version alone does not update an existing release's source. See the [release preparation steps](contributing.md#preparing-a-release).
+
 The app icon source and platform formats live in `src/assets/icons`. Regenerate ICO, ICNS, and Linux PNG files with `node scripts/generate-icons.mjs` after updating the source PNG. Builds embed these icons in platform packages and copy the native window icons to `resources/icons`.
 
 Builds are unsigned by default. Signing and notarization require a separate setup; the manual workflow handles uploading unsigned packages. The optional Linux AppImage requires the system packaging tools used by Electron Builder.

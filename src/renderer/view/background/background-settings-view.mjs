@@ -1,3 +1,5 @@
+import {workingIgnoreStrokes} from '../../model/image-protection.mjs';
+
 /** Validate removal settings and synchronize controls and saved presets. */
 export class BackgroundSettingsView {
   constructor(session) { this.session = session; }
@@ -32,6 +34,7 @@ export class BackgroundSettingsView {
   currentOptions() {
     const session = this.session;
     const options = {
+      effect_ignore:workingIgnoreStrokes(session.image),
       mode: session.method.value,
       background_source: session.backgroundSource.value,
       aggressive: session.aggressive.checked,

@@ -94,7 +94,7 @@ export class TimelineView {
     const speedSelect = document.querySelector("#speed-select");
     speedSelect.value = [...speedSelect.options].some((option) => option.value === String(project.playbackSpeed)) ? String(project.playbackSpeed) : "add";
     document.querySelector("#loop-toggle").setAttribute("aria-pressed", String(project.loopEnabled));
-    document.querySelector("#loop-toggle strong").textContent = project.loopEnabled ? "ON" : "OFF";
+    document.querySelector("#loop-toggle").dataset.tooltip = `Loop playback is ${project.loopEnabled ? 'on' : 'off'}`;
     document.querySelector("#default-duration").value = project.defaultDurationFrames;
     const projectTitle = document.querySelector("#project-name");
     if (document.activeElement !== projectTitle) projectTitle.value = project.name;

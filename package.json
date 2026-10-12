@@ -1,12 +1,13 @@
 {
   "name": "frameline",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "A frame-based image timeline editor",
   "main": "src/main.cjs",
   "scripts": {
     "start": "electron .",
     "test": "node --test",
     "test:ui": "electron scripts/electron-smoke.cjs",
+    "test:timeline": "electron scripts/electron-timeline-smoke.cjs",
     "test:main": "electron scripts/electron-processing-smoke.cjs",
     "test:backend": "python -m unittest discover -s tests -p test_*.py",
     "icons": "node scripts/generate-icons.mjs"

@@ -21,16 +21,25 @@ export class ToolPanelView extends ControllerBase {
       if (panel) panel.hidden = runtime.previewTool !== tool.id;
     }
     const colorControls = document.querySelector("#preview-brush-controls");
-    colorControls.hidden = !["brush", "eraser", "healing"].includes(runtime.previewTool);
+    const localBrush=['ignore','recover'].includes(runtime.previewTool);
+    colorControls.hidden = !["brush", "eraser", "healing",'ignore','recover'].includes(runtime.previewTool);
+    document.querySelector('#preview-local-brush-controls').hidden=!localBrush;
+    document.querySelector('#preview-ignore-settings').hidden=runtime.previewTool!=='ignore';
+    document.querySelector('#preview-local-brush-help').textContent=runtime.previewTool==='ignore'
+      ? 'Paint red marks to protect areas from effects. Each stroke is saved on release; Undo removes the last mark.'
+      : 'Brush to restore original pixels in this area. Each stroke is saved on release and can be undone.';
+    document.querySelector('#preview-brush-feather-field').hidden=localBrush;
+    document.querySelector('#preview-paint-actions').hidden=localBrush;
     document.querySelector("#preview-healing-controls").hidden = runtime.previewTool !== "healing";
     document.querySelector("#preview-brush-color-field").hidden = runtime.previewTool !== "brush";
     document.querySelector("#preview-brush-opacity-field").hidden = runtime.previewTool !== "brush";
-    document.querySelector("#preview-square-brush-option").hidden = !["brush", "healing"].includes(runtime.previewTool);
+    document.querySelector("#preview-square-brush-option").hidden = !["brush", "healing",'ignore','recover'].includes(runtime.previewTool);
     document.querySelector("#preview-brush-feather-value").value = `${document.querySelector("#preview-brush-feather").value}%`;
     document.querySelector("#preview-brush-color").value = runtime.foregroundColor;
     runtime.syncToolActivation();
     runtime.updatePreviewCrop();
     runtime.updateBrushCursor();
+    runtime.updateIgnoreOverlay?.();
   }
 
   /** Enable controls according to the active tool, source image, and processing state. */
@@ -48,7 +57,7 @@ export class ToolPanelView extends ControllerBase {
     checkbox.setAttribute("aria-label", `Enable ${runtime.previewTool} tool`);
     checkbox.dataset.tooltip = "Enable live preview. Apply commits changes and turns preview off; unchecking discards pending changes.";
     for (const [tool, panel] of [["crop", "crop"], ["outline", "outline"], ["padding", "padding"], ...runtime.toolRegistry.processors().map(tool => [tool.id, tool.id]), ["brush", "brush"]]) {
-      const active = runtime.previewToolEnabled && image && (runtime.previewTool === tool || tool === "brush" && ["eraser", "healing"].includes(runtime.previewTool));
+      const active = runtime.previewToolEnabled && image && (runtime.previewTool === tool || tool === "brush" && ["eraser", "healing",'ignore','recover'].includes(runtime.previewTool));
       for (const control of document.querySelectorAll(`#preview-${panel}-controls input, #preview-${panel}-controls select, #preview-${panel}-controls button`)) {
         control.disabled = !active || runtime.paddingBusy || runtime.outlineApplyBusy || runtime.refineBusy;
       }
@@ -65,7 +74,7 @@ export class ToolPanelView extends ControllerBase {
     const paintPending = Boolean(image && runtime.previewPaintDraft?.imageId === image.id && runtime.previewPaintDraft.strokes.length);
     document.querySelector("#preview-paint-apply").disabled = !paintActive || !paintPending;
     document.querySelector("#preview-paint-discard").disabled = !paintActive || !paintPending;
-    document.querySelector("#preview-stage").classList.toggle("painting", paintActive);
+    document.querySelector("#preview-stage").classList.toggle("painting", paintActive || ['ignore','recover'].includes(runtime.previewTool));
     document.querySelector("#preview-stage").classList.toggle("hand-tool", runtime.previewTool === 'hand');
     document.querySelector("#preview-healing-remove").disabled = !image || runtime.previewTool !== "healing"
       || document.querySelector("#preview-healing-auto").checked || runtime.paddingBusy || runtime.outlineApplyBusy || runtime.refineBusy;

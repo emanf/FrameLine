@@ -1,9 +1,30 @@
 import { ControllerBase } from '../controller-base.mjs';
 import { workingImageRequest } from '../../model/image-effects.mjs';
 import { cropPixelRect } from '../../model/crop-geometry.mjs';
+import {workingIgnoreStrokes,workingGeometry,translateIgnoreStrokes} from '../../model/image-protection.mjs';
+import {protectionMask,recoverPixels} from '../../model/protection-mask.mjs';
 
 /** Materialize working edits and manage image-processing requests. */
 export class ImageProcessingService extends ControllerBase {
+  /** Preserve marked pixels when an extension supplies a canvas rather than a Python result. */
+  async protectToolCanvas(canvas,image) {
+    if(!workingIgnoreStrokes(image)?.length) return canvas;
+    const runtime=this.application,source=await runtime.materializeWorkingImage(image);
+    try {
+      const bitmap=new Image();bitmap.src=runtime.localImageUrl(source.path);await bitmap.decode();
+      const result=document.createElement('canvas'),reference=document.createElement('canvas');
+      result.width=reference.width=canvas.width;result.height=reference.height=canvas.height;
+      const context=result.getContext('2d',{willReadFrequently:true});context.drawImage(canvas,0,0);
+      const x=Math.floor((canvas.width-source.width)/2),y=Math.floor((canvas.height-source.height)/2);
+      reference.getContext('2d').drawImage(bitmap,x,y);
+      const geometry=workingGeometry(image),marks=translateIgnoreStrokes(image.ignoreStrokes,image,canvas,geometry.x+x,geometry.y+y);
+      const mask=protectionMask(marks,canvas.width,canvas.height);
+      const pixels=context.getImageData(0,0,canvas.width,canvas.height),original=reference.getContext('2d').getImageData(0,0,canvas.width,canvas.height);
+      recoverPixels(pixels.data,original.data,mask.data);context.putImageData(pixels,0,0);
+      return result;
+    } finally {if(source.temporary) await window.frameLine.discardProcessedImages([source.path]);}
+  }
+
   /** Encode a local file path as a renderer-safe file URL. */
   localImageUrl(filePath) {
     const runtime = this.application;

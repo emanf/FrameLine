@@ -146,7 +146,7 @@ export class PreviewCanvasView extends ControllerBase {
     runtime.previewPaintContext.clearRect(0, 0, image.width, image.height);
     runtime.previewPaintContext.drawImage(runtime.completedPaintRaster(image, strokes, erasesImage), 0, 0);
     if (hasActiveStroke) {
-      runtime.drawPaintStroke(runtime.previewPaintContext, runtime.previewPaintStroke.stroke, image.width, image.height);
+      runtime.drawActivePaintStroke(runtime.previewPaintContext,image);
       runtime.paintRenderedPointCount = runtime.previewPaintStroke.stroke.points.length;
       runtime.paintDirtyRegion = null;
     }

@@ -323,7 +323,7 @@ app.whenReady().then(async () => {
     assert.equal(await evaluate(`document.querySelector('#preview-brush-antialias').checked`), true, 'anti-aliasing defaults on independently of feather');
     assert.deepEqual(await evaluate(`Array.from(document.querySelector('.preview-toolbox').children).map(node =>
       node.getAttribute('role') === 'separator' ? 'separator' : node.getAttribute('aria-label'))`),
-      ['Clear image effects for this image or all images', 'separator', 'Magic tools', 'separator', 'Enable features', 'separator', 'Basic tools']);
+      ['Restore tools', 'separator', 'Image effects', 'separator', 'Basic tools']);
     const gridButton = await evaluate(`(() => { const b = document.querySelector('#preview-grid-toggle').getBoundingClientRect(); return {x:Math.round(b.left+b.width/2), y:Math.round(b.top+b.height/2)}; })()`);
     window.webContents.sendInputEvent({type:'mouseMove', ...gridButton});
     await paintFrame();

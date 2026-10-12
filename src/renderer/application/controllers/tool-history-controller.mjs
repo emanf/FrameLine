@@ -37,7 +37,7 @@ export class ToolHistoryController extends ControllerBase {
   /** Enable Undo and Redo only when history is available and no gesture/commit is active. */
   syncHistoryButtons() {
     const runtime = this.application;
-    const busy = runtime.previewPaintPointerId !== null || runtime.previewCropDrag !== null || runtime.paddingBusy || runtime.outlineApplyBusy || runtime.refineBusy;
+    const busy = runtime.localBrushPointerId != null || runtime.previewPaintPointerId !== null || runtime.previewCropDrag !== null || runtime.paddingBusy || runtime.outlineApplyBusy || runtime.refineBusy;
     document.querySelector('#undo').disabled = busy || !(runtime.toolEditHistory.canUndo(runtime.vm.historyStateId) || runtime.vm.canUndo);
     document.querySelector('#redo').disabled = busy || !(runtime.toolEditHistory.canRedo(runtime.vm.historyStateId) || runtime.vm.canRedo);
   }
@@ -87,7 +87,7 @@ export class ToolHistoryController extends ControllerBase {
   /** Traverse transient gestures and persistent edits in their user-visible order. */
   navigateEditHistory(redo = false) {
     const runtime = this.application;
-    if (runtime.previewPaintPointerId !== null || runtime.previewCropDrag || runtime.paddingBusy || runtime.outlineApplyBusy || runtime.refineBusy) return;
+    if (runtime.localBrushPointerId != null || runtime.previewPaintPointerId !== null || runtime.previewCropDrag || runtime.paddingBusy || runtime.outlineApplyBusy || runtime.refineBusy) return;
     runtime.finishToolControlGesture();
     runtime.stopPlayback();
     const state = redo ? runtime.toolEditHistory.redo(runtime.vm.historyStateId) : runtime.toolEditHistory.undo(runtime.vm.historyStateId);

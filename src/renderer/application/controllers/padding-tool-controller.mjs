@@ -1,4 +1,5 @@
 import { ControllerBase } from '../controller-base.mjs';
+import {workingGeometry} from '../../model/image-protection.mjs';
 import { matchesToolSource } from '../../model/tool-draft.mjs';
 
 /** Preview linked or independent padding and preserve edited pixels. */
@@ -22,6 +23,7 @@ export class PaddingToolController extends ControllerBase {
     document.querySelector("#preview-crop-overlay").hidden = true;
     document.querySelector("#preview-resolution").textContent = `${canvas.width} × ${canvas.height}`;
     runtime.updatePreviewPixelGrid({ ...image, width: canvas.width, height: canvas.height, crop: null });
+    runtime.updateIgnoreOverlay?.(image);
   }
 
   /** Build the pending padding preview without changing the project image. */
@@ -120,7 +122,8 @@ export class PaddingToolController extends ControllerBase {
           const context = canvas.getContext("2d");
           if (!context) throw new Error("Could not create the padded image.");
           context.drawImage(source, padding.left, padding.top);
-          outputs.push({ imageId: target.id, ...await runtime.storeCanvasImage(canvas) });
+          const geometry=workingGeometry(target);
+          outputs.push({ imageId: target.id, ...await runtime.storeCanvasImage(canvas),sourceOffset:{x:geometry.x+padding.left,y:geometry.y+padding.top} });
           if (revision !== runtime.vm.editRevision) return false;
           progress.update(index + 1, `Added padding to ${target.name}`);
         } finally {

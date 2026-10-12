@@ -38,6 +38,7 @@ export class ProcessingToolController extends ControllerBase {
     document.querySelector('#preview-crop-overlay').hidden = true;
     document.querySelector('#preview-resolution').textContent = `${canvas.width} × ${canvas.height}`;
     runtime.updatePreviewPixelGrid({...image, width: canvas.width, height: canvas.height, crop: null});
+    runtime.updateIgnoreOverlay?.(image);
   }
 
   /** Capture validated active-processor options and replace the pending preview job. */

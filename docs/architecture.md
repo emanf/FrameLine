@@ -8,6 +8,8 @@ FrameLine separates project data, editing commands, presentation, desktop servic
 
 `src/renderer/app.mjs` creates `EditorApplication`. Its constructor composes the controllers and views; `start()` initializes state and binds inputs in dependency order. `ToolCoordinator` registers built-ins before preferences are restored, then loads installed extensions independently.
 
+About follows the same boundary: `AboutController` opens `AboutDialog`, and `AppInfoService` supplies release metadata. The preload exposes named contact-opening and copying commands; the renderer cannot supply arbitrary destinations or clipboard text through these commands. App version comes from the installed package, while author details and the update date live in `src/shared/app-info.json`.
+
 ```mermaid
 flowchart LR
   Views[Views and input controllers] --> Commands[View-model commands]
@@ -39,6 +41,8 @@ Application controllers call bound commands through the composition context. A c
 
 The background-removal modal creates a session shared by four components: settings validation, preview scheduling, navigation/display, and the protected-area brush. Its dialog coordinator owns attachment and cleanup of event handlers.
 
+Frame cleanup follows the same split: `timeline-cleanup.mjs` calculates retained intervals without changing the project; `TimelineCleanupViewModel` owns draft options and paged results; `TimelineCleanupDialog` renders controls and thumbnails. Large plans run in a module worker, and preview pages contain at most 48 items. Edited thumbnails use the current-image service with two concurrent requests and release temporary files when the page or dialog closes. The controller submits the reviewed plan through a revision-checked timeline command as one undo step.
+
 ## Tool architecture
 
 Every built-in tool is a class using the public tool inheritance tree. The registry validates IDs, metadata, API versions, and field schemas before mounting controls. Definitions are copied and frozen so a tool cannot change registered IDs or numeric bounds later.
@@ -46,6 +50,8 @@ Every built-in tool is a class using the public tool inheritance tree. The regis
 `ToolCoordinator` owns selection guards, discovery, backend routing, custom pointer dispatch, and custom canvas commits. `ToolControlsView` builds processor controls from descriptors. `ToolOptionsViewModel` validates their values independently of the DOM. Existing crop, padding, outline, and paint controllers retain their specialized interaction and rendering implementations; their tool classes delegate through the same lifecycle contract.
 
 Installed tools may provide a Python processor, override image processing in JavaScript, implement pointer hooks, or expose an immediate action. The [plugin guide](plugin-development.md) explains each path; the [API reference](tool-api.md) defines the contract.
+
+`ToolToolbarView` mounts buttons into logical `clear`, `magic`, `features`, and `basic` groups. The view uses a two-column grid: `clear` holds Clear and Recover in the restore section; `magic` and `features` flow together in the image-effects section; `basic` holds Hand and the remaining brushes. Separators belong to sections, so adding a tool cannot span a divider accidentally.
 
 ## Editing and history
 
@@ -56,6 +62,8 @@ Project edits record a snapshot before mutation, increment the edit revision, in
 Pending tool gestures have their own history tied to the project history-state ID. Releasing a brush stroke records one gesture. Apply promotes those strokes without collapsing their individual undo steps; batch processing commits all image results as one project edit.
 
 An image retains its original path and dimensions while its working result changes. Processing materializes the current crop, outline, and strokes before the next effect, preventing edits from being lost or applied twice. Clear restores the original; Undo restores the prior working result.
+
+`LocalBrushController` captures Ignore/Recover pointer gestures. Ignore strokes are image-space protection masks, saved with each image. Brush, Eraser, and Color Cleanup capture a mask snapshot per stroke so later changes to protection do not rewrite earlier edits. Backend effect commands and extension canvases composite the current working source through the same mask; overlays are view-only. Crop expands to retain protected footprints. Recover blends original RGBA in premultiplied color and bakes one PNG per released gesture, retaining crop bounds and unrelated edits. `originalOffset` records source alignment through cropping, padding, and outline changes. Older projects without alignment metadata use centered size differences.
 
 ## Async processing and progress
 
@@ -71,8 +79,10 @@ Python commands are grouped under `backend/commands/`: background operations, im
 
 Plugin results are ordinary working PNGs. Reopening a saved project does not require the plugin that produced them. Applied processing settings are baked into the image; FrameLine does not store a replayable plugin recipe. Tool preferences remain local to the application.
 
+Ignore overlay visibility is also a local preference (`previewIgnoreVisible`). The toolbar eye button and tool-panel checkbox share this value. `ignoreEnabled` and `ignoreStrokes` are project fields instead: hiding the overlay changes neither field, image pixels, nor history. The project format remains version 1.
+
 ## Performance boundaries
 
-Timeline/list views virtualize large collections. Brush rendering uses coalesced pointer samples and regional repainting. Working-image caches prevent repeated materialization, and Pillow processing caches have memory limits. Python processors should use native Pillow operations or tiled/vectorized processing instead of full-image Python pixel loops. Expensive work belongs in the processing service rather than DOM event handlers.
+Timeline/list views virtualize large collections. Brush rendering uses coalesced pointer samples and sparse 64-pixel coverage tiles. Smooth brushes retain the exact eight-by-eight subpixel union; pixel brushes retain integer stamps. Only appended segments are scanned, and changed pixels are composited against an immutable gesture baseline. Regional feather filtering reads its full support from cached coverage, so overlaps do not build opacity and release does not change the result. Brush, Eraser, Color Cleanup, Ignore, and Recover use this incremental path. Readback canvases use a CPU-friendly context to avoid repeated GPU transfers. Gesture tiles are released after completion or cancellation. Working-image caches prevent repeated materialization, and Pillow processing caches have memory limits. Python processors should use native Pillow operations or tiled/vectorized processing instead of full-image Python pixel loops. Expensive work belongs in the processing service rather than DOM event handlers.
 
-The refactor keeps those mechanisms and output behavior intact. It is a structural change; choosing a new folder or class does not itself make an algorithm faster.
+`brush-spans.mjs` provides the shared smooth scan converter; `IncrementalBrushMask` retains coverage and protection tiles; `BrushRasterView` composites painting operations; `LocalBrushController` renders protection and recovery. Complete rendering and export still use the same stroke geometry. Tests compare incremental masks against complete masks at every update, and Electron checks compare held, released, applied, and restored pixels. Use `scripts/benchmark-brush.mjs` to measure mask-update costs independently of display frame rate.

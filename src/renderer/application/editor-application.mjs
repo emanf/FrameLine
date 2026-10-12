@@ -32,6 +32,9 @@ import { ImageListController } from './controllers/image-list-controller.mjs';
 import { ClipMenuController } from './controllers/clip-menu-controller.mjs';
 import { ContextMenuView } from './controllers/context-menu-view.mjs';
 import { KeyboardController } from './controllers/keyboard-controller.mjs';
+import {TimelineCleanupController} from './controllers/timeline-cleanup-controller.mjs';
+import {AboutController} from './controllers/about-controller.mjs';
+import {LocalBrushController} from './controllers/local-brush-controller.mjs';
 
 /** Compose editor components and expose their bound commands to event handlers. */
 export class EditorApplication {
@@ -72,6 +75,9 @@ export class EditorApplication {
     this.components.set('ClipMenuController', new ClipMenuController(this));
     this.components.set('ContextMenuView', new ContextMenuView(this));
     this.components.set('KeyboardController', new KeyboardController(this));
+    this.components.set('TimelineCleanupController', new TimelineCleanupController(this));
+    this.components.set('AboutController',new AboutController(this));
+    this.components.set('LocalBrushController',new LocalBrushController(this));
     for (const component of this.components.values()) {
       for (const name of Object.getOwnPropertyNames(Object.getPrototypeOf(component))) {
         if (name === 'constructor' || name.startsWith('initialize')) continue;
@@ -88,9 +94,11 @@ export class EditorApplication {
     this.components.get('ToolPanelView').initializeEnableControl();
     this.components.get('EditorCoordinator').initializeProjectEvents();
     this.components.get('WindowController').initializeWindowEvents();
+    this.components.get('AboutController').initializeAboutEvents();
     this.components.get('PlaybackController').initializePlaybackEvents();
     this.components.get('ProjectController').initializeProjectActions();
     this.components.get('TimelineInputController').initializeTimelineSettings();
+    this.components.get('LocalBrushController').initializeLocalBrushEvents();
     this.components.get('BrushInputController').initializePointerEvents();
     this.components.get('ToolHistoryController').initializePaintActions();
     this.components.get('OutlineToolController').initializeOutlineControls();
@@ -104,6 +112,7 @@ export class EditorApplication {
     this.components.get('ClipMenuController').initializeContextMenus();
     this.components.get('ExportController').initializeExportEvents();
     this.components.get('KeyboardController').initializeKeyboardEvents();
+    this.components.get('TimelineCleanupController').initializeCleanupEvents();
     this.components.get('TimelineInputController').initializeClipResize();
     void this.tools.loadPlugins();
     window.addEventListener('beforeunload', () => this.toolRegistry.dispose());

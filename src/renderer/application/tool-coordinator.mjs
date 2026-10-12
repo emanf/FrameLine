@@ -3,6 +3,7 @@ import { builtinToolClasses } from '../tools/builtin/index.mjs';
 import { ToolControlsView } from '../view/tool-controls-view.mjs';
 import { ToolToolbarView } from '../view/tool-toolbar-view.mjs';
 import { workingImageRequest, hasImageEdits } from '../model/image-effects.mjs';
+import {ImageProcessorTool} from '../tools/sdk/tool-plugin.mjs';
 
 /** Own tool discovery and expose only the editor services needed by tool plugins. */
 export class ToolCoordinator {
@@ -37,7 +38,7 @@ export class ToolCoordinator {
       materializeImage: image => runtime.materializeWorkingImage(image),
       loadImage: async image => { const source = new Image(); source.src = runtime.localImageUrl(image.path); await source.decode(); return source; },
       storeCanvas: canvas => runtime.storeCanvasImage(canvas),
-      previewCanvas: canvas => this.previewCanvas(canvas),
+      previewCanvas: canvas => this.previewCanvas(canvas).catch(runtime.notifyError),
       commitCanvas: canvas => this.commitCanvas(canvas),
       mountPanel: panel => {
         if (!(panel instanceof HTMLElement)) throw new Error('Tool panels must be HTML elements.');
@@ -47,6 +48,20 @@ export class ToolCoordinator {
       releaseImages: paths => window.frameLine.discardProcessedImages(paths)
     });
     const tool = new Tool(context);
+    if(manifest && tool.isProcessor && tool.process !== ImageProcessorTool.prototype.process) {
+      const process=tool.process.bind(tool);
+      // JavaScript overrides do not pass through the Python command compositor.
+      tool.process=async (image,...args) => {
+        const result=await process(image,...args);
+        if(image.ignoreEnabled===false || !image.ignoreStrokes?.length) return result;
+        try {
+          const bitmap=new Image();bitmap.src=runtime.localImageUrl(result.path);await bitmap.decode();
+          const canvas=document.createElement('canvas');canvas.width=result.width;canvas.height=result.height;
+          canvas.getContext('2d').drawImage(bitmap,0,0);
+          return await runtime.storeCanvasImage(await runtime.protectToolCanvas(canvas,image));
+        } finally {await window.frameLine.discardProcessedImages([result.path]);}
+      };
+    }
     if (manifest && (tool.id !== manifest.id || tool.definition.buttonId)) throw new Error('Installed tools must use the manifest ID and their default button ID.');
     this.registry.register(tool);
     try {
@@ -108,10 +123,14 @@ export class ToolCoordinator {
   }
 
   /** Display a custom tool's full-image canvas as an uncommitted draft. */
-  previewCanvas(source) {
+  async previewCanvas(source) {
     const runtime = this.application;
     const image = runtime.currentPreviewImage();
     if (!image) return;
+    const revision=runtime.vm.editRevision,tool=runtime.previewTool;
+    const request=this.canvasPreviewSequence=(this.canvasPreviewSequence ?? 0)+1;
+    source=await runtime.protectToolCanvas(source,structuredClone(image));
+    if(request!==this.canvasPreviewSequence || revision!==runtime.vm.editRevision || image.id!==runtime.currentPreviewImage()?.id || tool!==runtime.previewTool) return;
     runtime.previewRefineDraft = runtime.createPreviewDraft(image, {options:{}, tool:runtime.previewTool});
     const canvas = document.querySelector('#preview-refine-canvas');
     canvas.width = source.width; canvas.height = source.height;
@@ -129,6 +148,7 @@ export class ToolCoordinator {
     const progress = runtime.showOperationProgress('Applying tool', 'Saving image…');
     let result, committed = false;
     try {
+      canvas = await runtime.protectToolCanvas(canvas,structuredClone(image));
       result = await runtime.storeCanvasImage(canvas);
       if (revision !== runtime.vm.editRevision || image.id !== runtime.currentPreviewImage()?.id) return false;
       runtime.discardPendingToolEdits(false);
@@ -144,7 +164,7 @@ export class ToolCoordinator {
   async select(id) {
     const runtime = this.application;
     if (runtime.toolSwitchBusy) return;
-    if (runtime.paddingBusy || runtime.outlineApplyBusy || runtime.refineBusy) { runtime.notifyError('Wait for the image operation to finish before switching tools.'); return; }
+    if (runtime.localBrushPointerId != null || runtime.paddingBusy || runtime.outlineApplyBusy || runtime.refineBusy) { runtime.notifyError('Wait for the image operation to finish before switching tools.'); return; }
     runtime.toolSwitchBusy = true;
     try {
       if (!await runtime.resolvePendingToolEdits()) return;
@@ -154,6 +174,7 @@ export class ToolCoordinator {
       runtime.previewToolEnabled = !runtime.isFeatureTool(runtime.previewTool);
       runtime.redrawPaintCanvas(); runtime.updatePreviewToolUi();
       runtime.prepareHealingReference(runtime.currentPreviewImage()); runtime.scheduleSavePreferences();
+      await runtime.prepareRecoverBrush?.();
     } finally { runtime.toolSwitchBusy = false; }
   }
 

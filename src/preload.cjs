@@ -2,6 +2,9 @@ const { contextBridge, ipcRenderer, webUtils } = require("electron");
 let nextImageImportId = 0;
 
 contextBridge.exposeInMainWorld("frameLine", {
+  getAppInfo: () => ipcRenderer.invoke('app:info'),
+  openAppLink: name => ipcRenderer.invoke('app:open-link',name),
+  copyAppContact: name => ipcRenderer.invoke('app:copy-contact',name),
   listToolPlugins: () => ipcRenderer.invoke('tools:list'),
   processToolImage: request => ipcRenderer.invoke('tools:process', request),
   chooseMedia: () => ipcRenderer.invoke("media:choose"),

@@ -1,4 +1,5 @@
 import { ControllerBase } from '../controller-base.mjs';
+import {workingIgnoreStrokes,workingGeometry} from '../../model/image-protection.mjs';
 
 
 /** Schedule cancellable outline previews and apply current settings. */
@@ -20,7 +21,7 @@ export class OutlineToolController extends ControllerBase {
     const runtime = this.application;
     // Paint, erasing, Color Cleanup, and crop are applied to the current result.
     // Replacing an unedited baked outline can still use its saved outline source.
-    const working = image.paintStrokes?.length || image.crop || image.outline;
+    const working = image.paintStrokes?.length || image.crop || image.outline || workingIgnoreStrokes(image)?.length;
     return {
       path:working ? image.path : image.outlineSourcePath ?? image.path,
       dimensions:working ? {width:image.width, height:image.height}
@@ -51,6 +52,7 @@ export class OutlineToolController extends ControllerBase {
     document.querySelector('#preview-crop-overlay').hidden = true;
     document.querySelector('#preview-resolution').textContent = `${canvas.width} × ${canvas.height}`;
     runtime.updatePreviewPixelGrid({...image, width:canvas.width, height:canvas.height, crop:null});
+    runtime.updateIgnoreOverlay?.(image);
   }
 
   /** Retire the outline draft and restore display of the current working image. */
@@ -120,12 +122,12 @@ export class OutlineToolController extends ControllerBase {
     let base, result, lease;
     try {
       if (!current()) return;
-      if (snapshot.paintStrokes?.length || snapshot.crop || snapshot.outline) {
+      if (snapshot.paintStrokes?.length || snapshot.crop || snapshot.outline || workingIgnoreStrokes(snapshot)?.length) {
         lease = await runtime.workingSourceCache.acquire(draft.source, () => runtime.materializeWorkingImage(snapshot));
         base = lease.result;
       } else base = {path:runtime.outlinePreviewBase(snapshot).path, temporary:false};
       if (!current()) return;
-      result = await runtime.runImageRequest('previewImageOutline', {path:base.path, outline}, event => {
+      result = await runtime.runImageRequest('previewImageOutline', {path:base.path, outline,effect_ignore:workingIgnoreStrokes(snapshot)}, event => {
         if (current()) {
           runtime.setToolProgress('outline', true, event);
           status.textContent = event.message;
@@ -186,7 +188,7 @@ export class OutlineToolController extends ControllerBase {
         imageId: target.id,
         basePath: target.outlineSourcePath ?? target.path,
         baseDimensions: target.outlineSourceDimensions ?? { width: target.width, height: target.height },
-        workingImage: (target.paintStrokes?.length || target.crop || target.outline) ? structuredClone(target) : null
+        workingImage: (target.paintStrokes?.length || target.crop || target.outline || workingIgnoreStrokes(target)?.length) ? structuredClone(target) : null
       })),
       outline
     };
@@ -217,7 +219,7 @@ export class OutlineToolController extends ControllerBase {
             const base = target.workingImage ? await runtime.materializeWorkingImage(target.workingImage)
               : { path: target.basePath, ...target.baseDimensions, temporary: false };
             if (base.temporary) outputPaths.push(base.path);
-            const result = await runtime.runImageRequest('applyImageOutline', { path: base.path, outline: job.outline }, event => {
+            const result = await runtime.runImageRequest('applyImageOutline', { path: base.path, outline: job.outline,effect_ignore:target.workingImage && workingIgnoreStrokes(target.workingImage) }, event => {
               progress.update(index + event.current / event.total, event.message);
             });
             outputPaths.push(result.path);
@@ -230,6 +232,7 @@ export class OutlineToolController extends ControllerBase {
               basePath: base.path,
               baseDimensions: { width: base.width, height: base.height },
               bakedEdits: Boolean(target.workingImage),
+              ...(target.workingImage ? {sourceOffset:{x:workingGeometry(target.workingImage).x+(result.width-base.width)/2,y:workingGeometry(target.workingImage).y+(result.height-base.height)/2}} : {}),
               outline: job.outline
             });
             progress.update(index + 1, `Outlined image ${index + 1} of ${job.targets.length}`);

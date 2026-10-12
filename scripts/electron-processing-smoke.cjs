@@ -1,5 +1,5 @@
 // Exercise production IPC/preload/Python workers instead of the UI suite's mocks.
-const {app, BrowserWindow, dialog, nativeImage}=require('electron');
+const {app, BrowserWindow, dialog, nativeImage, shell}=require('electron');
 const fs=require('node:fs');
 const os=require('node:os');
 const path=require('node:path');
@@ -21,6 +21,37 @@ app.whenReady().then(async()=>{
     const {applicationIconPath} = require('../src/main/application-icon.cjs');
     assert.equal(nativeImage.createFromPath(applicationIconPath()).isEmpty(), false, 'native app icon loads');
     assert.equal(await window.webContents.executeJavaScript(`(() => {const icon=document.querySelector('.brand-icon'); return icon.complete && icon.naturalWidth > 0;})()`), true, 'title bar icon loads');
+    // Exercise About through the real preload and IPC while keeping external navigation local.
+    const openedLinks = [], originalOpenExternal = shell.openExternal;
+    shell.openExternal = async url => {openedLinks.push(url);};
+    try {
+      const info = await window.webContents.executeJavaScript(`window.frameLine.getAppInfo()`);
+      assert.equal(info.version,require('../package.json').version);
+      assert.equal(info.author,'eManF');
+      assert.equal(await window.webContents.executeJavaScript(`document.querySelector('#app-about').nextElementSibling.id`),'window-minimize');
+      await window.webContents.executeJavaScript(`document.querySelector('#app-about').click()`);
+      for (let i=0;i<100;i++) {
+        if (await window.webContents.executeJavaScript(`document.querySelector('[data-app-info="version"]').textContent === ${JSON.stringify(info.version)}`)) break;
+        await new Promise(resolve=>setTimeout(resolve,25));
+      }
+      assert.equal(await window.webContents.executeJavaScript(`document.querySelector('#about-dialog').open && document.querySelector('time').dateTime === ${JSON.stringify(info.lastUpdated)}`),true);
+      for (const name of ['website','github','email']) {
+        await window.webContents.executeJavaScript(`document.querySelector('[data-app-link="${name}"]').click()`);
+        for(let i=0;i<100 && openedLinks.length < ['website','github','email'].indexOf(name)+1;i++) await new Promise(resolve=>setTimeout(resolve,25));
+      }
+      assert.deepEqual(openedLinks,[info.website,info.github,`mailto:${info.email}`]);
+      assert.equal(BrowserWindow.getAllWindows().length,1,'About links do not open renderer windows');
+      assert.equal(await window.webContents.executeJavaScript(`window.frameLine.openAppLink('file:///C:/unsafe.exe').then(()=>false,()=>true)`),true,'IPC rejects arbitrary URLs');
+      window.webContents.sendInputEvent({type:'keyDown',keyCode:'Escape'});
+      window.webContents.sendInputEvent({type:'keyUp',keyCode:'Escape'});
+      for(let i=0;i<100;i++) {
+        if(await window.webContents.executeJavaScript(`!document.querySelector('#about-dialog').open && document.activeElement.id === 'app-about'`)) break;
+        await new Promise(resolve=>setTimeout(resolve,25));
+      }
+      assert.equal(await window.webContents.executeJavaScript(`!document.querySelector('#about-dialog').open && document.activeElement.id === 'app-about'`),true,'Escape dismisses and restores focus');
+      await window.webContents.executeJavaScript(`document.querySelector('#app-about').click(); document.querySelector('#about-dialog [data-about-close]').click();`);
+      assert.equal(await window.webContents.executeJavaScript(`document.querySelector('#about-dialog').open`),false,'close button dismisses About');
+    } finally {shell.openExternal = originalOpenExternal;}
     let secondLaunch=false;
     app.once('second-instance',()=>{secondLaunch=true;});
     const secondary=spawn(process.execPath,[path.join(__dirname,'electron-singleton-probe.cjs'),temporary],
@@ -58,7 +89,8 @@ app.whenReady().then(async()=>{
         edited.push(await window.frameLine.renderCurrentImage({path:input.path,crop:{left:0.25,top:0.25,right:0.75,bottom:0.75}}));
       }
       const images=imported.map((image,index)=>({...image,id:'format-'+index,name:'ImageName'+String(index+1).padStart(3,'0'),path:edited[index].path,width:16,height:12,
-        originalPath:image.path,originalDimensions:{width:32,height:24}}));
+        originalPath:image.path,originalDimensions:{width:32,height:24},originalOffset:{x:-8,y:-6},ignoreEnabled:true,
+        ignoreStrokes:[{size:3,shape:'square',antiAlias:false,feather:0,points:[[.5,.5]]}]}));
       const project={version:1,name:'SVG and AVIF',fps:24,defaultDurationFrames:24,playbackSpeed:1,loopEnabled:true,
         loopStartFrame:0,loopEndFrame:null,currentFrame:0,images,clips:images.map((image,index)=>({id:'clip-'+index,imageId:image.id,durationFrames:24}))};
       const saved=await window.frameLine.saveProject(project);
@@ -83,6 +115,9 @@ app.whenReady().then(async()=>{
       const exported=path.join(temporary,'format-exports',reopened.name+'.png');
       assert.deepEqual(fs.readFileSync(exported),fs.readFileSync(reopened.path),'source export uses renamed labels and the real image extension');
       assert(fs.existsSync(reopened.path)&&fs.existsSync(reopened.originalPath));
+      assert.deepEqual(reopened.originalOffset,{x:-8,y:-6});
+      assert.equal(reopened.ignoreEnabled,true);
+      assert.deepEqual(reopened.ignoreStrokes,[{size:3,shape:'square',antiAlias:false,feather:0,points:[[.5,.5]]}]);
       assert.deepEqual(fs.readFileSync(reopened.path),fs.readFileSync(formatResult.edited[index].path),'portable save preserves edited pixels');
       assert.deepEqual(fs.readFileSync(reopened.originalPath),fs.readFileSync(image.path),'portable save preserves the imported appearance for Clear');
     }
@@ -91,26 +126,27 @@ app.whenReady().then(async()=>{
       const context=canvas.getContext('2d');context.fillStyle='#30a0dc';context.fillRect(15,10,34,28);
       const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
       const input=await window.frameLine.storeWorkingImage(new Uint8Array(await blob.arrayBuffer()));
+      const effect_ignore=[{size:8,shape:'square',antiAlias:true,feather:0,points:[[.25,.4]]}];
       const events=[];const stop=window.frameLine.onImageProgress(event=>events.push(event));
       try {
-        const preview=await window.frameLine.previewImageOutline({path:input.path,outline:{size:3,position:'outside'},operationId:'outline-preview'});
-        const applied=await window.frameLine.applyImageOutline({path:input.path,outline:{size:3,position:'outside'},operationId:'outline-apply'});
+        const preview=await window.frameLine.previewImageOutline({path:input.path,effect_ignore,outline:{size:3,position:'outside'},operationId:'outline-preview'});
+        const applied=await window.frameLine.applyImageOutline({path:input.path,effect_ignore,outline:{size:3,position:'outside'},operationId:'outline-apply'});
         const options={clean:10,repair:60,smooth:25,shrink:0,width:2};
-        const refinedPreview=await window.frameLine.previewRefineEdges({path:input.path,options,operationId:'refine-preview'});
-        const refinedApply=await window.frameLine.refineImageEdges({path:input.path,options,operationId:'refine-apply'});
+        const refinedPreview=await window.frameLine.previewRefineEdges({path:input.path,effect_ignore,options,operationId:'refine-preview'});
+        const refinedApply=await window.frameLine.refineImageEdges({path:input.path,effect_ignore,options,operationId:'refine-apply'});
         const pluginList=await window.frameLine.listToolPlugins();
-        const pluginPreview=await window.frameLine.processToolImage({toolId:'example-invert',preview:true,path:input.path,options:{strength:75},operationId:'plugin-preview'});
-        const pluginApply=await window.frameLine.processToolImage({toolId:'example-invert',path:input.path,options:{strength:75},operationId:'plugin-apply'});
+        const pluginPreview=await window.frameLine.processToolImage({toolId:'example-invert',preview:true,path:input.path,effect_ignore,options:{strength:75},operationId:'plugin-preview'});
+        const pluginApply=await window.frameLine.processToolImage({toolId:'example-invert',path:input.path,effect_ignore,options:{strength:75},operationId:'plugin-apply'});
         let invalidPlugin=false;try{await window.frameLine.processToolImage({toolId:'unregistered',processor:'engine.py',path:input.path});}catch{invalidPlugin=true;}
         const cleanOptions={strength:80,tolerance:32,radius:2,speckles:60};
-        const cleanPreview=await window.frameLine.previewCleanPixels({path:input.path,options:cleanOptions,operationId:'clean-preview'});
-        const cleanApply=await window.frameLine.cleanImagePixels({path:input.path,options:cleanOptions,operationId:'clean-apply'});
+        const cleanPreview=await window.frameLine.previewCleanPixels({path:input.path,effect_ignore,options:cleanOptions,operationId:'clean-preview'});
+        const cleanApply=await window.frameLine.cleanImagePixels({path:input.path,effect_ignore,options:cleanOptions,operationId:'clean-apply'});
         const removed=await window.frameLine.removeBackground({path:input.path,mode:'chroma',key_color:[0,255,0],tolerance:128,softness:0,spill:0,operationId:'background-apply'});
         context.fillStyle='#e6dcd2';context.fillRect(0,0,64,48);
         context.fillStyle='#30a0dc';context.fillRect(15,10,34,28);
         const autoBlob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
         const autoInput=await window.frameLine.storeWorkingImage(new Uint8Array(await autoBlob.arrayBuffer()));
-        const autoOptions={path:autoInput.path,mode:'auto',background_source:'auto',tolerance:128,softness:0,spill:0,
+        const autoOptions={path:autoInput.path,effect_ignore,mode:'auto',background_source:'auto',tolerance:128,softness:0,spill:0,
           ignore_strokes:[{size:.15,points:[[.1,.5],[.15,.5]]}]};
         const autoPreview=await window.frameLine.previewBackground({...autoOptions,operationId:'auto-preview'});
         const autoApplied=await window.frameLine.removeBackground({...autoOptions,operationId:'auto-apply'});
@@ -130,6 +166,13 @@ app.whenReady().then(async()=>{
       const events=result.events.filter(event=>event.operationId===operationId);
       assert(events.some(event=>event.current>0 && event.current<event.total),operationId+' streams stage progress');
       assert.equal(events.at(-1).current,100);
+    }
+    const sourcePixels=await sharp(result.input.path).ensureAlpha().raw().toBuffer();
+    for(const output of [result.applied,result.refinedApply,result.cleanApply,result.pluginApply]) {
+      const pixels=await sharp(output.path).ensureAlpha().raw().toBuffer();
+      const dx=(output.width-result.input.width)/2,dy=(output.height-result.input.height)/2;
+      const offset=((19+dy)*output.width+16+dx)*4;
+      assert.deepEqual(pixels.subarray(offset,offset+4),sourcePixels.subarray((19*64+16)*4,(19*64+16)*4+4),'production effect respects Ignore marks');
     }
     assert.equal(result.pluginList.plugins[0].id,'example-invert');
     assert.equal(result.invalidPlugin,true,'unregistered processor selection is rejected');

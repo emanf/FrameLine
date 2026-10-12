@@ -1,5 +1,6 @@
 import { ControllerBase } from '../controller-base.mjs';
 import { cropPixelRect } from '../../model/crop-geometry.mjs';
+import {brushImagePoint,brushFootprint} from '../../model/brush-geometry.mjs';
 
 /** Maintain preview zoom, pan, and brush cursor geometry. */
 export class PreviewNavigationView extends ControllerBase {
@@ -7,7 +8,7 @@ export class PreviewNavigationView extends ControllerBase {
   updateBrushCursor(clientX = this.application.brushCursorPosition?.x, clientY = this.application.brushCursorPosition?.y) {
     const runtime = this.application;
     if (clientX !== undefined && clientY !== undefined) runtime.brushCursorPosition = { x: clientX, y: clientY };
-    if (clientX === undefined || clientY === undefined || !runtime.previewToolEnabled || !["brush", "eraser", "healing"].includes(runtime.previewTool) || runtime.previewImageWrap.hidden) {
+    if (clientX === undefined || clientY === undefined || !runtime.previewToolEnabled || !["brush", "eraser", "healing",'ignore','recover'].includes(runtime.previewTool) || runtime.previewImageWrap.hidden) {
       runtime.previewBrushCursor.hidden = true;
       return;
     }
@@ -30,28 +31,16 @@ export class PreviewNavigationView extends ControllerBase {
     }
     const stageBounds = document.querySelector("#preview-stage").getBoundingClientRect();
     const size = runtime.currentBrushSize();
-    const squareBrush = ["brush", "healing"].includes(runtime.previewTool) && document.querySelector("#preview-square-brush").checked;
+    const squareBrush = ["brush", "healing",'ignore','recover'].includes(runtime.previewTool) && document.querySelector("#preview-square-brush").checked;
     const pixelBrush = !document.querySelector("#preview-brush-antialias").checked;
     runtime.previewBrushCursor.classList.toggle("square", squareBrush);
-    if (pixelBrush) {
-      const pixelWidth = Math.max(1, Math.round(size));
-      const scaleX = bounds.width / image.width;
-      const scaleY = bounds.height / image.height;
-      const pixelX = Math.min(image.width - 1, Math.floor((clientX - bounds.left) / scaleX));
-      const pixelY = Math.min(image.height - 1, Math.floor((clientY - bounds.top) / scaleY));
-      const left = bounds.left + (pixelX - Math.floor(pixelWidth / 2) + pixelWidth / 2) * scaleX;
-      const top = bounds.top + (pixelY - Math.floor(pixelWidth / 2) + pixelWidth / 2) * scaleY;
-      runtime.previewBrushCursor.style.width = `${pixelWidth * scaleX}px`;
-      runtime.previewBrushCursor.style.height = `${pixelWidth * scaleY}px`;
-      runtime.previewBrushCursor.style.left = `${left - stageBounds.left}px`;
-      runtime.previewBrushCursor.style.top = `${top - stageBounds.top}px`;
-    } else {
-      const displaySize = size * bounds.width / image.width;
-      runtime.previewBrushCursor.style.width = `${Math.max(1, displaySize)}px`;
-      runtime.previewBrushCursor.style.height = `${Math.max(1, displaySize)}px`;
-      runtime.previewBrushCursor.style.left = `${clientX - stageBounds.left}px`;
-      runtime.previewBrushCursor.style.top = `${clientY - stageBounds.top}px`;
-    }
+    const point = brushImagePoint(clientX,clientY,bounds,image.width,image.height,pixelBrush);
+    const footprint = brushFootprint(point,size,image.width,image.height,pixelBrush);
+    const scaleX = bounds.width/image.width, scaleY = bounds.height/image.height;
+    runtime.previewBrushCursor.style.width = `${footprint.width*scaleX}px`;
+    runtime.previewBrushCursor.style.height = `${footprint.height*scaleY}px`;
+    runtime.previewBrushCursor.style.left = `${bounds.left+(footprint.left+footprint.width/2)*scaleX-stageBounds.left}px`;
+    runtime.previewBrushCursor.style.top = `${bounds.top+(footprint.top+footprint.height/2)*scaleY-stageBounds.top}px`;
     runtime.previewBrushCursor.hidden = false;
   }
 

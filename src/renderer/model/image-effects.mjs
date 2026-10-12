@@ -1,10 +1,15 @@
-// Baked outlines add symmetric padding. Keep existing edits attached to the
-// same image pixels when that padding changes, including on outline reset.
-export function rebaseImageEdits(image, width, height) {
-  const dx = (width - image.width) / 2;
-  const dy = (height - image.height) / 2;
+import {workingIgnoreStrokes,translateIgnoreStrokes,originalOffset} from './image-protection.mjs';
+
+/** Keep edits, protection, and original pixels aligned when an effect translates the canvas. */
+export function rebaseImageEdits(image, width, height, translation) {
+  const dx = translation?.x ?? Math.floor((width - image.width) / 2);
+  const dy = translation?.y ?? Math.floor((height - image.height) / 2);
+  const original=originalImage(image),offset=originalOffset(image,original.dimensions);
+  if(image.ignoreStrokes?.length) image.ignoreStrokes=translateIgnoreStrokes(image.ignoreStrokes,image,{width,height},dx,dy);
+  image.originalOffset={x:offset.x+dx,y:offset.y+dy};
   const clamp = (value) => Math.max(0, Math.min(1, value));
   for (const stroke of image.paintStrokes ?? []) {
+    if(stroke.ignoreStrokes) stroke.ignoreStrokes=translateIgnoreStrokes(stroke.ignoreStrokes,image,{width,height},dx,dy);
     stroke.points = stroke.points.map(([x, y]) => [
       clamp((x * image.width + dx) / width),
       clamp((y * image.height + dy) / height)
@@ -51,7 +56,8 @@ export function workingImageRequest(image) {
     path: image.path,
     paint_strokes: image.paintStrokes ?? [],
     crop: image.crop,
-    outline: image.outline
+    outline: image.outline,
+    effect_ignore:workingIgnoreStrokes(image)
   };
 }
 
@@ -64,7 +70,7 @@ export function clearPendingEffects(image) {
 export function hasImageEdits(image) {
   if (!image) return false;
   const original = originalImage(image);
-  return Boolean(image.sourcePath || image.paintStrokes?.length || image.crop || image.outline || image.outlineSourcePath
+  return Boolean(image.ignoreStrokes?.length || image.sourcePath || image.paintStrokes?.length || image.crop || image.outline || image.outlineSourcePath
     || image.path !== original.path || image.width !== original.dimensions.width || image.height !== original.dimensions.height);
 }
 

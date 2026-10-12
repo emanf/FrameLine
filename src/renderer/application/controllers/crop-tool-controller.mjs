@@ -1,5 +1,6 @@
 import { ControllerBase } from '../controller-base.mjs';
 import { cropPixelRect, cropFromPixelRect } from '../../model/crop-geometry.mjs';
+import {protectedCrop} from '../../model/image-protection.mjs';
 
 /** Coordinate pixel crop fields, handles, and committed crop commands. */
 export class CropToolController extends ControllerBase {
@@ -18,9 +19,10 @@ export class CropToolController extends ControllerBase {
     if (runtime.previewCropDraft && (runtime.previewCropDraft.imageId !== image.id || runtime.previewCropDraft.editRevision !== runtime.vm.editRevision)) {
       runtime.previewCropDraft = null;
     }
-    const crop = runtime.previewCropDrag?.imageId === image.id
+    const requested = runtime.previewCropDrag?.imageId === image.id
       ? runtime.previewCropDrag.crop
       : runtime.previewCropDraft?.crop ?? image.crop ?? { left: 0, top: 0, right: 1, bottom: 1 };
+    const crop = runtime.previewCropDrag || runtime.previewCropDraft ? protectedCrop(image,requested) : requested;
     const left = crop.left;
     const top = crop.top;
     const right = crop.right;
@@ -44,9 +46,10 @@ export class CropToolController extends ControllerBase {
   /** Show exact pixel bounds, retaining incomplete focused input until validation finishes. */
   syncCropFields(image, crop, force = false) {
     const runtime = this.application;
+    if(image && crop && (runtime.previewCropDraft?.imageId===image.id || runtime.previewCropDrag?.imageId===image.id)) crop=protectedCrop(image,crop);
     const rect = image ? cropPixelRect(image.width, image.height, crop) : null;
     document.querySelector("#preview-crop-dimensions").textContent = image
-      ? `Image: ${image.width} × ${image.height} px` : "Image size: —";
+      ? `Image: ${image.width} × ${image.height} px${image.ignoreEnabled!==false && image.ignoreStrokes?.length ? ' · Crop retains Ignore marks' : ''}` : "Image size: —";
     for (const field of document.querySelectorAll("[data-crop-field]")) {
       const key = field.dataset.cropField;
       field.disabled = !image || !runtime.previewToolEnabled || runtime.previewTool !== "crop";

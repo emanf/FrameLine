@@ -65,7 +65,7 @@ export class PreferencesController extends ControllerBase {
       ["--properties-panel-width", runtime.savedPreferences.propertiesPanelWidth, 160, 1000],
       ["--timeline-height", runtime.savedPreferences.timelineHeight, 160, 1000]
     ]) {
-      if (Number.isFinite(Number(value))) {
+      if (value != null && Number.isFinite(Number(value))) {
         document.documentElement.style.setProperty(variable, `${runtime.clampNumber(value, min, max, min)}px`);
       }
     }
@@ -91,6 +91,7 @@ export class PreferencesController extends ControllerBase {
       runtime.toolControls.write(tool.id, runtime.savedPreferences.toolOptions?.[tool.id] ?? legacy);
     }
     document.querySelector("#preview-grid-visible").checked = runtime.previewGridEnabled;
+    document.querySelector('#preview-ignore-visible').checked=runtime.savedPreferences.previewIgnoreVisible !== false;
     document.querySelector("#preview-grid-size").value = String(runtime.clampNumber(runtime.savedPreferences.previewGridSize, 1, 256, 8));
     document.querySelector("#preview-grid-opacity").value = String(runtime.clampNumber(runtime.savedPreferences.previewGridOpacity, 0, 100, 25));
     document.querySelector("#preview-grid-toggle").classList.toggle("grid-enabled", runtime.previewGridEnabled);
@@ -123,7 +124,8 @@ export class PreferencesController extends ControllerBase {
         previewZoom:runtime.previewZoom,
         imagePanelWidth: document.querySelector(".image-panel").getBoundingClientRect().width,
         propertiesPanelWidth: document.querySelector(".properties-panel").getBoundingClientRect().width,
-        timelineHeight: document.querySelector(".timeline-panel").getBoundingClientRect().height,
+        timelineHeight: document.documentElement.style.getPropertyValue('--timeline-height')
+          ? document.querySelector('.timeline-panel').getBoundingClientRect().height : undefined,
         customFrameRates:runtime.customFrameRates,
         customPlaybackSpeeds:runtime.customPlaybackSpeeds,
         brushColor: runtime.foregroundColor,
@@ -143,6 +145,7 @@ export class PreferencesController extends ControllerBase {
         cleanPixels: runtime.cleanOptions(),
         toolOptions: Object.fromEntries(runtime.toolRegistry.processors().map(tool => [tool.id, runtime.processingOptions(tool.id)])),
         previewGridEnabled:runtime.previewGridEnabled,
+        previewIgnoreVisible:document.querySelector('#preview-ignore-visible').checked,
         previewGridSize: number("#preview-grid-size"),
         previewGridOpacity: number("#preview-grid-opacity"),
         previewBackgroundColor: document.querySelector("#preview-background-color").value,
@@ -198,7 +201,7 @@ export class PreferencesController extends ControllerBase {
     runtime.backgroundPreviewTask = Promise.resolve();
 
     runtime.previewPaintCanvas = document.querySelector("#preview-paint-canvas");
-    runtime.previewPaintContext = runtime.previewPaintCanvas.getContext("2d");
+    runtime.previewPaintContext = runtime.previewPaintCanvas.getContext("2d",{willReadFrequently:true});
     runtime.previewImageWrap = document.querySelector("#preview-image-wrap");
     runtime.previewBrushCursor = document.querySelector("#preview-brush-cursor");
     runtime.previewPixelGrid = document.querySelector("#preview-pixel-grid");

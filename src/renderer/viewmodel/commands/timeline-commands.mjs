@@ -1,11 +1,40 @@
-import { totalFrames } from '../../model/project-model.mjs';
+import { totalFrames, validateProject } from '../../model/project-model.mjs';
 import { preserveOriginal } from '../../model/image-effects.mjs';
+import {cleanupDefaults,timelineCleanupPlan} from '../../model/timeline-cleanup.mjs';
+import {survivingBefore} from '../../model/frame-intervals.mjs';
 
 const copy = value => JSON.parse(JSON.stringify(value));
 
 /** Edit whole-frame clips while preserving ordered ranges and grouped history. */
 export class TimelineCommands {
   constructor(viewModel) { this.viewModel = viewModel; }
+
+  /** Commit a previewed sampling pattern as one reversible edit, retaining source assets. */
+  cleanupTimeline(options, selectedIds = [...this.viewModel.selectedClipIds], expectedRevision = this.viewModel.editRevision, preparedPlan = null) {
+    const vm = this.viewModel;
+    if (expectedRevision !== vm.editRevision) throw new Error('The timeline changed. Reopen Frame cleanup to review the new result.');
+    const plan = preparedPlan ?? timelineCleanupPlan(vm.project,options,selectedIds);
+    if (preparedPlan) {
+      if (JSON.stringify(plan.options) !== JSON.stringify({...cleanupDefaults,...options})) throw new Error('The preview settings changed. Recalculate the result before applying.');
+      validateProject({...vm.project,clips:plan.clips,currentFrame:0,loopStartFrame:0,loopEndFrame:null});
+    }
+    if (!plan.changed) return false;
+    vm.record();
+    vm.project.clips = plan.clips;
+    if (plan.options.timing !== 'hold') {
+      vm.project.currentFrame = survivingBefore(plan.keptFrames,vm.project.currentFrame);
+      vm.project.loopStartFrame = survivingBefore(plan.keptFrames,vm.project.loopStartFrame ?? 0);
+      if (vm.project.loopEndFrame != null) vm.project.loopEndFrame = survivingBefore(plan.keptFrames,vm.project.loopEndFrame);
+    }
+    const known = new Set(plan.clips.map(clip => clip.id));
+    const selection = [...vm.selectedClipIds].filter(id => known.has(id));
+    vm.setSelection(selection.length ? selection : [plan.clips[0].id],
+      known.has(vm.selectedClipId) ? vm.selectedClipId : selection[0] ?? plan.clips[0].id);
+    vm.previewImageId = null;
+    vm.clampCurrentFrame();
+    vm.notify();
+    return true;
+  }
 
   /** Insert a source-image clip at the requested whole frame. */
   insertImage(imageId, frame) {
@@ -137,6 +166,20 @@ export class TimelineCommands {
     const remaining = this.viewModel.project.clips.filter(clip => !this.viewModel.selectedClipIds.has(clip.id));
     if (!selected.length || !remaining.length) return false;
     return this.viewModel.moveSelectedClips(toEnd ? remaining.at(-1).id : remaining[0].id, toEnd);
+  }
+
+  /** Reverse selected clips in their existing slots, leaving unselected clips untouched. */
+  reverseSelected() {
+    const selected = this.viewModel.selectedClips;
+    if (selected.length < 2) return false;
+    this.viewModel.record();
+    const reversed = [...selected].reverse();
+    let index = 0;
+    this.viewModel.project.clips = this.viewModel.project.clips.map(clip =>
+      this.viewModel.selectedClipIds.has(clip.id) ? reversed[index++] : clip);
+    this.viewModel.clampCurrentFrame();
+    this.viewModel.notify();
+    return true;
   }
 
   /** Set positive whole-frame durations for the selected clips as one edit. */

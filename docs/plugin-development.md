@@ -113,17 +113,23 @@ async process(image, options, {onProgress} = {}) {
 
 Return a host-owned `{path, width, height}` PNG result. The scheduler releases previews and uncommitted outputs. Do not return an arbitrary source path as temporary output. Materialize once to include crop and paint; release only sources marked `temporary`.
 
+The host preserves active Ignore areas after a JavaScript override returns, just as it does after a Python processor. Return the normal processed image; do not apply the mask again. Custom canvas previews and commits honor the same protection, and hiding the red overlay does not bypass it. See [protected areas and original alignment](tool-api.md#protected-areas-and-original-alignment) for the saved fields and canvas alignment rule.
+
 JavaScript runs in the renderer and cannot access Node APIs. CPU-heavy processing should use Python or another explicitly integrated worker, with progress and cancellation. Yielding once does not make a long synchronous loop responsive.
 
 ## Pointer and action tools
 
 Extend `PointerTool` with `mode: 'pointer'` and `group: 'basic'` for a gesture tool. Override `pointerDown`, `pointerMove`, and `pointerUp`; return `true` synchronously to consume an event. The host captures consumed pointer gestures and supplies normalized image coordinates, pressure, modifiers, coalesced samples, and cancellation state. Right-button panning remains handled by the preview.
 
-Use `context.materializeImage` and `context.loadImage` to prepare a canvas, `context.previewCanvas(canvas)` for an uncommitted display, and `context.commitCanvas(canvas)` on release to create one undo step. `commitCanvas` saves an owned PNG with revision guards and visible progress. Keep a prepared canvas available before accepting a pointer-down; pointer hooks cannot wait for asynchronous image decoding. Override `apply` when your gesture leaves a pending draft instead of committing on release. Override `deactivate` to clear gesture state after switching tools, and `dispose` for retained resources.
+Use `context.materializeImage` and `context.loadImage` to prepare a canvas, `context.previewCanvas(canvas)` for an uncommitted display, and `context.commitCanvas(canvas)` on release to create one undo step. Canvas preview returns a Promise and skips obsolete display results; do not await it inside a synchronous pointer hook. `commitCanvas` saves an owned PNG with revision guards and visible progress. Keep a prepared canvas available before accepting a pointer-down; pointer hooks cannot wait for asynchronous image decoding. Override `apply` when your gesture leaves a pending draft instead of committing on release. Override `deactivate` to clear gesture state after switching tools, and `dispose` for retained resources.
+
+Keep stroke work proportional to new samples and changed pixels. Cache previous coverage, combine overlapping stamps before blending opacity, and update at most once per animation frame. Replaying the complete gesture or reading the full canvas on every pointer event becomes slower as the stroke grows. The built-in incremental mask implementation is an internal reference, not an additional public SDK dependency.
 
 Extend `ActionTool` with `mode: 'action'` and override `activate()` for immediate commands or custom dialogs. The base ActionTool routes built-in actions; an installed action supplies its own implementation. Before changing an image, use a canvas commit or a processor rather than modifying project objects directly.
 
 `mount()` can create custom controls and pass an element to `context.mountPanel(element)`. Use app theme classes such as `brush-controls`, `tool-option`, and `secondary-button`. The host manages its visibility; the plugin owns handlers and must remove them in `dispose()`. Custom adjustment tools can react to `enabledChanged(enabled)`. Schema-driven `ImageProcessorTool` remains the simplest choice for effects requiring current/all scope and managed Apply/Discard.
+
+Tool buttons flow through the two-column sections automatically. `magic` and `features` share the effects area; `basic` belongs below its divider; `clear` is the top restoration area. The section layout does not change the mode or processing contract. API version remains 1.
 
 ## Persistence and trust
 
@@ -133,6 +139,6 @@ Extensions are trusted local code. Renderer modules retain Electron's renderer i
 
 ## Testing a tool
 
-Test options at their limits, transparent images, colorful artwork, small images, cropped/painted inputs, preview/Apply equality, current/all scope, Undo/Redo, Discard, cancellation, and save/open. Use the example as a fixture rather than enabling it for all users.
+Test options at their limits, transparent images, colorful artwork, small images, cropped/painted inputs, preview/Apply equality, current/all scope, Undo/Redo, Discard, cancellation, and save/open. Include protected areas with the overlay both visible and hidden, and long uninterrupted strokes for pointer tools. Use the example as a fixture rather than enabling it for all users.
 
 `tests/tool-plugins.test.mjs` covers registry and discovery behavior. `tests/test_tool_plugin.py` covers the Python SDK. `npm run test:main` copies the example to a temporary extension folder and exercises actual discovery, renderer controls, preview processing, batch Apply, Undo/Redo, progress, and portable save/open.

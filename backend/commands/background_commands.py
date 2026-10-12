@@ -183,6 +183,8 @@ class BackgroundCommands:
         result = Image.merge('RGBA', (*rgb.split(), alpha))
         if protected is not None and protected.getbbox():
             result = Image.composite(image, result, protected)
+        from protected_effects import protect_effect
+        result = protect_effect(image,result,request.get('effect_ignore'),context.check_cancelled)
         output = Path(request['output'])
         output.parent.mkdir(parents=True, exist_ok=True)
         result.save(output, format='PNG', compress_level=1)

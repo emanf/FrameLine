@@ -99,24 +99,11 @@ The app uses Electron and Node.js for desktop integration, vanilla JavaScript ES
 | Timeline editing and rendering | `src/renderer/viewmodel/`, `src/renderer/view/` |
 | Processing and project archives | `backend/` |
 
-Package standalone apps with `python scripts/build.py`. See [Building and platform support](docs/building.md) for setup, separate architecture folders, and the owner-only manual workflow that uploads packages to your latest release.
-
 For editing steps and the current toolbox layout, see the [User guide](docs/user-guide.md).
 
 Developer guides: [Architecture](docs/architecture.md), [Plugin development](docs/plugin-development.md), [Tool API](docs/tool-api.md), and [Contributing](docs/contributing.md). A complete [Invert Colors extension](docs/examples/invert-colors) demonstrates the installation and processing contract.
 
-Run the checks from the repository folder:
-
-```sh
-npm test
-npm run test:backend
-npm run test:ui
-npm run test:timeline
-npm run test:main
-```
-
-These cover model/editing behavior, image and export processing, UI workflows, and production Electron/Python integration. For effect timings and output-pixel hashes, run `python scripts/benchmark-effects.py`. Compare long-stroke coverage timings with `node scripts/benchmark-brush.mjs`.
 
 ## Author
 
-Created by [eManF](http://emanf.ir). Contact [emanf.cco@gmail.com](mailto:emanf.cco@gmail.com). The About window shows the installed version, update date, and contact links with copy buttons.
+Created by [eManF](http://emanf.ir). Contact [emanf.cco@gmail.com](mailto:emanf.cco@gmail.com).

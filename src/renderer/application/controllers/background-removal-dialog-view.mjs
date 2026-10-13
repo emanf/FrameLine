@@ -4,6 +4,8 @@ import {BackgroundSettingsView} from '../../view/background/background-settings-
 import {BackgroundPreviewController} from '../../view/background/background-preview-controller.mjs';
 import {BackgroundNavigationView} from '../../view/background/background-navigation-view.mjs';
 import {BackgroundIgnoreBrushView} from '../../view/background/background-ignore-brush-view.mjs';
+import {BackgroundKeyingView} from '../../view/background/background-keying-view.mjs';
+import {BackgroundContourView} from '../../view/background/background-contour-view.mjs';
 
 /** Compose a background-removal session and release all modal handlers on close. */
 export class BackgroundRemovalDialogView extends ControllerBase {
@@ -19,6 +21,7 @@ export class BackgroundRemovalDialogView extends ControllerBase {
     session.syncMethod = backgroundSettingsView.syncMethod.bind(backgroundSettingsView);
     session.updateValues = backgroundSettingsView.updateValues.bind(backgroundSettingsView);
     session.updateFringeValue = backgroundSettingsView.updateFringeValue.bind(backgroundSettingsView);
+    session.resetSettings = backgroundSettingsView.resetSettings.bind(backgroundSettingsView);
     const backgroundPreviewController = new BackgroundPreviewController(session);
     session.fitPreview = backgroundPreviewController.fitPreview.bind(backgroundPreviewController);
     session.setPreviewStatus = backgroundPreviewController.setPreviewStatus.bind(backgroundPreviewController);
@@ -124,6 +127,10 @@ export class BackgroundRemovalDialogView extends ControllerBase {
     document.querySelector("#background-color-value").textContent = "Not sampled";
     session.errorElement.hidden = true;
     session.form.reset();
+    session.keyingView=new BackgroundKeyingView(session);
+    session.keyingView.restore(session.saved?.keying);
+    session.contourView = new BackgroundContourView(session);
+    session.contourView.restore(session.saved);
     session.method.value = session.saved?.settings_version === session.runtime.BACKGROUND_SETTINGS_VERSION && ['auto', 'sample', 'chroma'].includes(session.saved?.mode) ? session.saved.mode : 'auto';
     session.backgroundSource.value = session.saved?.background_source === 'custom' ? 'custom' : 'auto';
     session.aggressive.checked = session.saved?.aggressive === true;
@@ -230,6 +237,8 @@ export class BackgroundRemovalDialogView extends ControllerBase {
             ...session.storedFringeOptions(),
             key_color: session.keyColor.value,
             spill_color: session.spillColor.value,
+            keying:session.keyingView.options(),
+            ...session.contourView.storedOptions(),
             edge_tint_enabled: session.edgeTintEnabled.checked,
             edge_color: session.edgeColor.value,
             edge_tint: Number(session.edgeTint.value)
@@ -255,6 +264,8 @@ export class BackgroundRemovalDialogView extends ControllerBase {
             ...session.storedFringeOptions(),
             key_color: session.keyColor.value,
             spill_color: session.spillColor.value,
+            keying:session.keyingView.options(),
+            ...session.contourView.storedOptions(),
             edge_tint_enabled: session.edgeTintEnabled.checked,
             edge_color: session.edgeColor.value,
             edge_tint: Number(session.edgeTint.value)
@@ -273,6 +284,7 @@ export class BackgroundRemovalDialogView extends ControllerBase {
       bindings.listen(session.previewFrame, 'pointercancel', session.finishIgnoreStroke);
       bindings.listen(session.previewFrame, 'pointerleave', session.hideIgnoreCursor);
       bindings.listen(cancelButton, "click", close);
+      bindings.listen(document.querySelector('#background-reset-settings'), 'click', session.resetSettings);
       bindings.listen(applyAllButton, "click", applyAll);
       bindings.listen(session.keyColor, "input", session.scheduleBackgroundPreview);
       bindings.listen(session.spillColor, "input", session.updateValues);
@@ -308,6 +320,8 @@ export class BackgroundRemovalDialogView extends ControllerBase {
       bindings.listen(session.fringeColor, "input", session.updateValues);
       for (const { input } of session.fringeFields) bindings.listen(input, "input", session.updateFringeValue);
       bindings.listen(session.spill, "input", session.updateValues);
+      session.keyingView.bind(bindings);
+      session.contourView.bind(bindings);
       bindings.listen(connected, "change", session.scheduleBackgroundPreview);
       bindings.listen(session.form, "submit", submit);
       bindings.listen(session.dialog, "close", onClose);

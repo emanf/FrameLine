@@ -108,7 +108,13 @@ export class ImageProcessingService extends ControllerBase {
     const unsubscribe = window.frameLine.onImageProgress(event => {
       if (event.operationId === operationId) onProgress?.(event);
     });
-    try { return await window.frameLine[method]({...request, operationId}); }
+    try {
+      const result = await window.frameLine[method]({...request, operationId});
+      if (result?.cancelled === true && result.code === 'PREVIEW_SUPERSEDED') {
+        throw Object.assign(new Error('Preview superseded.'), {code: 'PREVIEW_SUPERSEDED'});
+      }
+      return result;
+    }
     finally { unsubscribe(); }
   }
 

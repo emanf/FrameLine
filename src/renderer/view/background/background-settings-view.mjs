@@ -4,6 +4,26 @@ import {workingIgnoreStrokes} from '../../model/image-protection.mjs';
 export class BackgroundSettingsView {
   constructor(session) { this.session = session; }
 
+  /** Restore factory processing values without clearing painted protection or view settings. */
+  resetSettings() {
+    const session = this.session;
+    for (const input of session.dialog.querySelectorAll('.background-settings input')) {
+      if (input.type === 'checkbox') input.checked = input.defaultChecked;
+      else input.value = input.defaultValue;
+    }
+    for (const select of session.dialog.querySelectorAll('.background-settings select')) {
+      select.selectedIndex = Math.max(0, [...select.options].findIndex(option => option.defaultSelected));
+    }
+    session.keyingView.restore(null);
+    session.contourView.restore(null);
+    session.sampleState = {point: null, color: null};
+    document.querySelector('#background-color-swatch').style.backgroundColor = 'transparent';
+    document.querySelector('#background-color-value').textContent = 'Not sampled';
+    document.querySelector('#background-set-default').checked = false;
+    session.syncMethod();
+    session.updateValues();
+  }
+
   /** Collect active edge-color cleanup parameters and optional custom color endpoints. */
   fringeOptions() {
     const session = this.session;
@@ -42,11 +62,13 @@ export class BackgroundSettingsView {
       tolerance: Number(session.tolerance.value),
       softness: !session.softnessEnabled.checked || session.smoothingEnabled.checked || (session.fringeEnabled.checked && session.fringeMethod.value === 'recover' && Number(document.querySelector('#background-fringe-strength').value)>0) ? 0 : Number(session.softness.value),
       edge_smoothing: session.smoothingEnabled.checked ? Number(session.smoothingAmount.value) : 0,
+      ...session.contourView.options(),
       spill: Number(session.spill.value),
       spill_color: session.spillColor.value.match(/[a-f\d]{2}/gi).map((channel) => parseInt(channel, 16)),
       connected_only: document.querySelector("#background-connected").checked,
       key_color: session.keyColor.value.match(/[a-f\d]{2}/gi).map((channel) => parseInt(channel, 16))
     };
+    if(session.method.value==='auto') options.keying=session.keyingView.options();
     if (session.edgeTintEnabled.checked) {
       options.edge_color = session.edgeColor.value.match(/[a-f\d]{2}/gi).map((channel) => parseInt(channel, 16));
       options.edge_tint = Number(session.edgeTint.value);
@@ -68,6 +90,8 @@ export class BackgroundSettingsView {
       background_source: options.background_source,
       aggressive: options.aggressive,
       aggressive_amount: options.aggressive_amount,
+      keying:session.keyingView.options(),
+      ...session.contourView.storedOptions(),
       tolerance: options.tolerance,
       softness: Number(session.softness.value),
       softness_enabled: session.softnessEnabled.checked,
@@ -90,6 +114,7 @@ export class BackgroundSettingsView {
     const session = this.session;
     const sampleMode = session.method.value === "sample";
     const autoMode = session.method.value === 'auto';
+    session.keyingView.setAlgorithm(null);
     document.querySelector('#background-auto-settings').hidden = !autoMode;
     document.querySelector('#background-aggressive-settings').hidden = !session.aggressive.checked;
     document.querySelector('#background-aggressive-value').textContent = `${session.aggressiveAmount.value}%`;
@@ -103,7 +128,7 @@ export class BackgroundSettingsView {
     session.sampleHint.textContent = session.sampleState.point
       ? `Sample selected: RGB ${session.sampleState.color.join(", ")}. Click another background point to change it.`
       : "Click the background in the image to sample its color.";
-    session.previewFrame.style.cursor = session.ignoreEnabled || sampleMode ? "crosshair" : "grab";
+    session.previewFrame.style.cursor = session.runtime.backgroundPreviewDrag ? 'grabbing' : session.ignoreEnabled || sampleMode ? 'crosshair' : 'default';
     document.querySelector("#background-apply-all").disabled = sampleMode && !session.sampleState.point;
     session.scheduleBackgroundPreview();
     

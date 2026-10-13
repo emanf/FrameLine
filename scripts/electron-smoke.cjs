@@ -518,20 +518,33 @@ app.whenReady().then(async () => {
     await click("#preview-remove-background");
     await until(() => evaluate(`document.querySelector('#background-dialog').open`), "background dialog");
     await until(async () => Boolean(releaseBackgroundPreview), 'slow background preview started');
+    assert.deepEqual(backgroundPreviewRequest.keying,{screen_balance:.5,black_level:0,white_level:1,edge_size:3,edge_tolerance:.1,despill_strength:1,despill_balance:.5,connected_only:false},'Auto uses soft-keying defaults matching the reference node');
     assert.equal(await evaluate(`document.querySelector('#background-filename') === null`), true, 'background subtitle is removed');
     assert.deepEqual(await evaluate(`(() => {
       const d=document;
       return {tolerance:d.querySelector('#background-tolerance').value, blur:d.querySelector('#background-softness').value,
         blurEnabled:d.querySelector('#background-softness-enabled').checked,
-        effects:[...d.querySelectorAll('.background-settings input[type="checkbox"]')].map(f=>f.checked),
+        effects:[...d.querySelectorAll('.background-settings input[type="checkbox"]:not(#background-contour-preserve-corners)')].map(f=>f.checked),
         spill:d.querySelector('#background-spill').value};
-    })()`), {tolerance:'128', blur:'4', blurEnabled:false, effects:[false,false,false,false,false,false,false], spill:'0'},
+    })()`), {tolerance:'128', blur:'4', blurEnabled:false, effects:[false,false,false,false,false,false,false,false,false], spill:'0'},
     'the new preset replaces old stored defaults with tolerance 128 and all optional effects off');
     assert.equal(backgroundPreviewRequest.softness, 0, 'disabled blur does not affect pixels');
     assert.equal(backgroundPreviewRequest.mode, 'auto', 'Auto Background is the new default');
     assert.equal(backgroundPreviewRequest.background_source, 'auto');
     assert.equal(backgroundPreviewRequest.aggressive, false);
     assert.equal(backgroundPreviewRequest.spill, 0);
+    assert.equal(backgroundPreviewRequest.contour_smoothing, 0, 'contour reshaping is initially disabled');
+    assert.deepEqual(backgroundPreviewRequest.contour_options,{method:'curve',preserve_corners:true,strength:100,radius:32,corner_angle:110},'curve settings are independent of the disabled effect');
+    assert.equal(await evaluate(`getComputedStyle(document.querySelector('#background-preview-frame')).cursor`), 'default', 'normal removal preview uses the arrow cursor');
+    const previewBounds = await evaluate(`(() => {const r=document.querySelector('#background-preview-frame').getBoundingClientRect();return {x:Math.round(r.left+r.width/2),y:Math.round(r.top+r.height/2)};})()`);
+    window.webContents.sendInputEvent({type:'mouseMove', ...previewBounds});
+    window.webContents.sendInputEvent({type:'mouseDown', button:'right', clickCount:1, ...previewBounds});
+    await until(()=>evaluate(`getComputedStyle(document.querySelector('#background-preview-frame')).cursor === 'grabbing'`), 'right button activates pan cursor');
+    window.webContents.sendInputEvent({type:'mouseMove', x:previewBounds.x+20, y:previewBounds.y+12});
+    window.webContents.sendInputEvent({type:'mouseUp', button:'right', clickCount:1, x:previewBounds.x+20, y:previewBounds.y+12});
+    await until(()=>evaluate(`getComputedStyle(document.querySelector('#background-preview-frame')).cursor === 'default'`), 'release restores the arrow cursor');
+    assert.equal(await evaluate(`document.querySelector('#background-sample-image').style.getPropertyValue('--background-preview-x')`),'20px','right dragging still pans the preview');
+    await click('#background-preview-fit');
     assert.equal(await evaluate(`document.querySelector('#background-preview-status').getAttribute('aria-busy')==='true'
       && !document.querySelector('#background-preview-progress').hidden
       && !document.querySelector('#background-preview-progress').hasAttribute('value')
@@ -554,10 +567,68 @@ app.whenReady().then(async () => {
     await evaluate(`document.querySelector('#background-tolerance').dispatchEvent(new Event('input'));`);
     await until(() => evaluate(`document.querySelector('#background-preview-status-text').textContent.startsWith('Preview ready') && document.querySelector('#background-error').hidden`), 'preview recovers after an error');
     assert.equal(await evaluate(`document.querySelector('#preview-image').src`), pathToFileURL(blue).href, 'preview processing leaves the main image unchanged');
+    await click('#background-contour-enabled');
+    await evaluate(`document.querySelector('#background-contour-tolerance').value='2.5';document.querySelector('#background-contour-tolerance').dispatchEvent(new Event('input'));`);
+    await until(()=>backgroundPreviewRequest.contour_smoothing===2.5, 'geometric contour tolerance updates the preview');
+    assert.equal(await evaluate(`document.querySelector('#background-contour-tolerance-value').textContent`),'2.5 px');
+    assert.equal(await evaluate(`JSON.parse(localStorage.getItem('frameline.background.last')).contour_smoothing_enabled`),true);
+    await evaluate(`(() => {
+      for(const [name,value] of Object.entries({strength:70,radius:64,'corner-angle':75})) {
+        const field=document.querySelector('#background-contour-'+name);field.value=String(value);field.dispatchEvent(new Event('input'));
+      }
+      document.querySelector('#background-contour-preserve-corners').click();
+    })()`);
+    await until(()=>backgroundPreviewRequest.contour_options?.radius===64 && backgroundPreviewRequest.contour_options.strength===70 && !backgroundPreviewRequest.contour_options.preserve_corners,'curve strength, size and corner settings update together');
+    assert.equal(await evaluate(`document.querySelector('#background-contour-strength-value').textContent`),'70%');
+    assert.equal(await evaluate(`JSON.parse(localStorage.getItem('frameline.background.last')).contour_options.corner_angle`),75,'corner angle is saved in presets');
+    await evaluate(`document.querySelector('#background-contour-method').value='pixel';document.querySelector('#background-contour-method').dispatchEvent(new Event('change'));`);
+    await until(()=>backgroundPreviewRequest.contour_options?.method==='pixel','pixel cleanup remains available separately');
+    assert.equal(await evaluate(`document.querySelector('#background-contour-curve-settings').hidden`),true);
+    await evaluate(`document.querySelector('#background-contour-method').value='curve';document.querySelector('#background-contour-method').dispatchEvent(new Event('change'));`);
+    if (process.env.FRAMELINE_CONTOUR_SCREENSHOT) {
+      const scrollTop = await evaluate(`document.querySelector('.background-settings').scrollTop`);
+      await evaluate(`document.querySelector('#background-contour-settings').scrollIntoView({block:'center'});`);
+      await paintFrame();
+      fs.writeFileSync(process.env.FRAMELINE_CONTOUR_SCREENSHOT,(await window.webContents.capturePage()).toPNG());
+      await evaluate(`document.querySelector('.background-settings').scrollTop=${scrollTop};`);
+      await paintFrame();
+    }
+    await click('#background-contour-enabled');
+    await until(()=>backgroundPreviewRequest.contour_smoothing===0, 'disabling contour cleanup restores the previous algorithm');
     await evaluate(`document.querySelector('#background-source').value='custom';document.querySelector('#background-source').dispatchEvent(new Event('change'));
       document.querySelector('#background-key-color').value='#283c50';document.querySelector('#background-key-color').dispatchEvent(new Event('input'));`);
     await until(() => backgroundPreviewRequest.background_source === 'custom', 'custom Auto Background preview');
     assert.deepEqual(backgroundPreviewRequest.key_color, [40,60,80]);
+    await evaluate(`(() => {
+      for(const [name,value] of Object.entries({'screen-balance':.25,'black-level':.08,'white-level':.85,'edge-size':4,'edge-tolerance':.2,'despill-strength':.7,'despill-balance':.75})) {
+        const field=document.querySelector('#background-keying-'+name);field.value=String(value);field.dispatchEvent(new Event('input'));
+      }
+      const connected=document.querySelector('#background-keying-connected');connected.checked=true;connected.dispatchEvent(new Event('change'));
+    })()`);
+    await until(()=>backgroundPreviewRequest.keying?.screen_balance===.25 && backgroundPreviewRequest.keying.connected_only,'node-style keying controls update preview');
+    assert.deepEqual(backgroundPreviewRequest.keying,{screen_balance:.25,black_level:.08,white_level:.85,edge_size:4,edge_tolerance:.2,despill_strength:.7,despill_balance:.75,connected_only:true});
+    assert.equal(await evaluate(`document.querySelector('#background-keying-screen-balance-value').textContent`),'0.250');
+    await until(()=>evaluate(`JSON.parse(localStorage.getItem('frameline.background.last')).keying.despill_strength === .7`),'keying controls saved with preset');
+    if (process.env.FRAMELINE_KEYING_SCREENSHOT) {
+      await evaluate(`document.querySelector('#background-keying-screen-balance').closest('details').open=true;`);
+      await paintFrame();
+      fs.writeFileSync(process.env.FRAMELINE_KEYING_SCREENSHOT, (await window.webContents.capturePage()).toPNG());
+    }
+    await evaluate(`(() => {
+      const black=document.querySelector('#background-keying-black-level');black.value='.9';black.dispatchEvent(new Event('input'));
+    })()`);
+    assert.equal(await evaluate(`Number(document.querySelector('#background-keying-white-level').value)>Number(document.querySelector('#background-keying-black-level').value)`),true,'level sliders keep a valid interval');
+    await click('#background-reset-settings');
+    await until(()=>backgroundPreviewRequest.background_source==='auto' && backgroundPreviewRequest.keying.black_level===0 && backgroundPreviewRequest.keying.screen_balance===.5,'reset restores factory keying settings');
+    assert.deepEqual(backgroundPreviewRequest.keying,{screen_balance:.5,black_level:0,white_level:1,edge_size:3,edge_tolerance:.1,despill_strength:1,despill_balance:.5,connected_only:false});
+    assert.equal(backgroundPreviewRequest.tolerance,128);
+    assert.equal(backgroundPreviewRequest.contour_smoothing,0);
+    assert.equal(await evaluate(`document.querySelector('#background-method').selectedOptions[0].textContent`),'Screen Keying','method name describes the processing system');
+    assert.equal(await evaluate(`[...document.querySelectorAll('.background-settings input[type="checkbox"]:not(#background-contour-preserve-corners)')].every(input=>!input.checked)`),true,'reset disables optional processing');
+    assert.deepEqual(backgroundPreviewRequest.contour_options,{method:'curve',preserve_corners:true,strength:100,radius:32,corner_angle:110},'reset restores curve defaults');
+    await evaluate(`document.querySelector('#background-source').value='custom';document.querySelector('#background-source').dispatchEvent(new Event('change'));
+      document.querySelector('#background-key-color').value='#283c50';document.querySelector('#background-key-color').dispatchEvent(new Event('input'));`);
+
     assert.equal(await evaluate(`document.querySelector('#background-key-color-field').hidden`), false);
     await click('#background-aggressive');
     await evaluate(`document.querySelector('#background-aggressive-amount').value='70';document.querySelector('#background-aggressive-amount').dispatchEvent(new Event('input'));`);
@@ -2217,11 +2288,21 @@ app.whenReady().then(async () => {
     await click('#background-ignore-brush');
     await until(()=>evaluate(`document.querySelector('#background-preview-status-text').textContent.startsWith('Preview ready')`),'disabling painting retains Ignore protection');
     assert.deepEqual(await ignoredPreviewPixel(),[32,219,64,255]);
+    const marksBeforeReset=await evaluate(`document.querySelector('#background-ignore-overlay').toDataURL()`);
+    await evaluate(`document.querySelector('#background-tolerance').value='180';document.querySelector('#background-tolerance').dispatchEvent(new Event('input'));`);
+    await click('#background-reset-settings');
+    await until(()=>backgroundPreviewRequest.tolerance===128 && backgroundPreviewRequest.ignore_strokes?.length===1
+      && evaluate(`document.querySelector('#background-preview-status-text').textContent.startsWith('Preview ready')`),'reset keeps existing protection and refreshes the preview');
+    assert.equal(await evaluate(`document.querySelector('#background-ignore-overlay').toDataURL()`),marksBeforeReset,'reset processing settings leaves the painted Ignore mask intact');
+    assert.deepEqual(await ignoredPreviewPixel(),[32,219,64,255]);
     if(process.env.FRAMELINE_IGNORE_BRUSH_SCREENSHOT){await click('#background-ignore-brush');await paintFrame();fs.writeFileSync(process.env.FRAMELINE_IGNORE_BRUSH_SCREENSHOT,(await window.webContents.capturePage()).toPNG());}
     const autoBatchStart=backgroundApplyRequests.length;
+    await click('#background-contour-enabled');
+    await until(()=>backgroundPreviewRequest.contour_smoothing===8,'batch contour preview uses the selected maximum movement');
     await click('#background-set-default');
     await click('#background-apply-all');
     await until(()=>backgroundApplyRequests.length===autoBatchStart+2,'Auto processes every batch image');
+    assert(backgroundApplyRequests.slice(autoBatchStart).every(request=>request.contour_smoothing===8 && request.contour_options?.method==='curve' && request.contour_options.strength===100),'Apply to all sends identical curve settings for every image');
     await until(()=>evaluate(`!document.querySelector('#operation-progress-dialog').open && !document.querySelector('#preview-remove-background').disabled`),'Auto batch finishes');
     assert(backgroundApplyRequests.slice(autoBatchStart).every(request=>request.mode==='auto' && request.background_source==='auto' && !request.aggressive),'each image independently detects its own background');
     assert.equal(await evaluate(`'ignore_strokes' in JSON.parse(localStorage.getItem('frameline.background.defaults'))`),false,'Ignore marks never leak into saved defaults');

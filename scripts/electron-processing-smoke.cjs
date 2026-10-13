@@ -148,21 +148,33 @@ app.whenReady().then(async()=>{
         const autoInput=await window.frameLine.storeWorkingImage(new Uint8Array(await autoBlob.arrayBuffer()));
         const autoOptions={path:autoInput.path,effect_ignore,mode:'auto',background_source:'auto',tolerance:128,softness:0,spill:0,
           ignore_strokes:[{size:.15,points:[[.1,.5],[.15,.5]]}]};
-        const autoPreview=await window.frameLine.previewBackground({...autoOptions,operationId:'auto-preview'});
+        const transientAutoPreview=await window.frameLine.previewBackground({...autoOptions,operationId:'auto-preview'});
+        const autoPreview={...transientAutoPreview,...await window.frameLine.renderCurrentImage({path:transientAutoPreview.path})};
         const autoApplied=await window.frameLine.removeBackground({...autoOptions,operationId:'auto-apply'});
+        context.fillStyle='#04f404';context.fillRect(0,0,64,48);
+        context.fillStyle='#141414';context.fillRect(15,10,34,28);
+        context.fillStyle='#03aa03';context.fillRect(14,10,1,28);
+        const screenBlob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
+        const screenInput=await window.frameLine.storeWorkingImage(new Uint8Array(await screenBlob.arrayBuffer()));
+        const screenOptions={mode:'auto',path:screenInput.path,background_source:'custom',key_color:[4,244,4],tolerance:128,
+          contour_smoothing:2,
+          contour_options:{method:'curve',strength:100,radius:16,preserve_corners:true,corner_angle:110},
+          keying:{screen_balance:.5,black_level:.02,white_level:.95,edge_size:3,edge_tolerance:.1,despill_strength:1,despill_balance:.5,connected_only:false}};
+        const screenPreview=await window.frameLine.previewBackground({...screenOptions,operationId:'screen-preview'});
+        const screenApply=await window.frameLine.removeBackground({...screenOptions,operationId:'screen-apply'});
         const invalid=await window.frameLine.storeWorkingImage(new Uint8Array([1,2,3])).then(()=>false,()=>true);
         await window.frameLine.cancelImagePreview();
-        return {pluginList,pluginPreview,pluginApply,invalidPlugin,input,preview,applied,refinedPreview,refinedApply,cleanPreview,cleanApply,removed,autoInput,autoPreview,autoApplied,events,invalid};
+        return {pluginList,pluginPreview,pluginApply,invalidPlugin,input,preview,applied,refinedPreview,refinedApply,cleanPreview,cleanApply,removed,autoInput,autoPreview,autoApplied,screenInput,screenPreview,screenApply,events,invalid};
       } finally {stop();}
     })()`);
     assert.deepEqual([result.input.width,result.input.height],[64,48]);
     assert.equal(result.invalid,true);
     assert.deepEqual(result.autoPreview.background_colors,[[230,220,210]],'production Auto detects the image border color');
-    for(const [first,second] of [[result.pluginPreview,result.pluginApply],[result.preview,result.applied],[result.refinedPreview,result.refinedApply],[result.cleanPreview,result.cleanApply],[result.autoPreview,result.autoApplied]]) {
+    for(const [first,second] of [[result.pluginPreview,result.pluginApply],[result.preview,result.applied],[result.refinedPreview,result.refinedApply],[result.cleanPreview,result.cleanApply],[result.autoPreview,result.autoApplied],[result.screenPreview,result.screenApply]]) {
       assert.deepEqual([first.width,first.height],[second.width,second.height]);
       assert.deepEqual(fs.readFileSync(first.path),fs.readFileSync(second.path),'production preview and Apply encode identical images');
     }
-    for(const operationId of ['plugin-preview','plugin-apply','outline-preview','outline-apply','refine-preview','refine-apply','clean-preview','clean-apply','background-apply','auto-preview','auto-apply']) {
+    for(const operationId of ['plugin-preview','plugin-apply','outline-preview','outline-apply','refine-preview','refine-apply','clean-preview','clean-apply','background-apply','auto-preview','auto-apply','screen-preview','screen-apply']) {
       const events=result.events.filter(event=>event.operationId===operationId);
       assert(events.some(event=>event.current>0 && event.current<event.total),operationId+' streams stage progress');
       assert.equal(events.at(-1).current,100);
@@ -174,6 +186,10 @@ app.whenReady().then(async()=>{
       const offset=((19+dy)*output.width+16+dx)*4;
       assert.deepEqual(pixels.subarray(offset,offset+4),sourcePixels.subarray((19*64+16)*4,(19*64+16)*4+4),'production effect respects Ignore marks');
     }
+    assert.equal(result.screenApply.keying_algorithm,'screen-keying');
+    const screenPixels=await sharp(result.screenApply.path).ensureAlpha().raw().toBuffer();
+    const fringeOffset=(20*64+14)*4;
+    assert(screenPixels[fringeOffset+1]<10 && screenPixels[fringeOffset+3]>0 && screenPixels[fringeOffset+3]<255,'keying recovers a soft dark edge while removing green spill');
     assert.equal(result.pluginList.plugins[0].id,'example-invert');
     assert.equal(result.invalidPlugin,true,'unregistered processor selection is rejected');
     await window.webContents.executeJavaScript(`(async()=>{
@@ -204,7 +220,38 @@ app.whenReady().then(async()=>{
     const pluginProject=await window.webContents.executeJavaScript('window.frameLine.openProject()');
     assert.equal(pluginProject.project.images.length,2);
     assert.ok(pluginProject.project.images.every(image=>image.originalPath && image.path!==image.originalPath),'batch plugin results preserve originals in portable saves');
-    const files=[result.pluginPreview,result.pluginApply,result.input,result.preview,result.applied,result.refinedPreview,result.refinedApply,result.cleanPreview,result.cleanApply,result.removed,result.autoInput,result.autoPreview,result.autoApplied].map(item=>item.path);
+    const cancellationLogs = [], originalConsoleError = console.error;
+    console.error = (...values) => {
+      if (values.some(value => String(value).includes('Preview superseded'))) cancellationLogs.push(values);
+      originalConsoleError(...values);
+    };
+    try {
+      const cancelled = await window.webContents.executeJavaScript(`(async()=>{
+        const canvas=document.createElement('canvas');canvas.width=1024;canvas.height=1536;
+        const context=canvas.getContext('2d');context.fillStyle='#00ff00';context.fillRect(0,0,canvas.width,canvas.height);
+        context.fillStyle='#c83270';context.fillRect(100,100,824,1336);
+        const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
+        const input=await window.frameLine.storeWorkingImage(new Uint8Array(await blob.arrayBuffer()));
+        let replacement;
+        const stop=window.frameLine.onImageProgress(event=>{
+          if(event.operationId==='superseded-background' && !replacement) {
+            replacement=window.frameLine.previewBackground({path:${JSON.stringify(result.input.path)},mode:'auto',background_source:'custom',key_color:[0,255,0],operationId:'replacement-background'});
+          }
+        });
+        try {
+          const obsolete=await window.frameLine.previewBackground({path:input.path,mode:'auto',contour_smoothing:2,operationId:'superseded-background'});
+          if(!replacement) throw new Error('Preview did not report progress before completion.');
+          const latest=await replacement;
+          return {obsolete,width:latest.width};
+        } finally {
+          stop();await window.frameLine.discardProcessedImages([input.path]);
+        }
+      })()`);
+      assert.deepEqual(cancelled.obsolete,{cancelled:true,code:'PREVIEW_SUPERSEDED'},'real superseded preview resolves through IPC as routine cancellation');
+      assert.equal(cancelled.width,64,'replacement preview finishes normally');
+      assert.equal(cancellationLogs.length,0,'routine cancellation does not produce Electron handler error logs');
+    } finally {console.error = originalConsoleError;}
+    const files=[result.pluginPreview,result.pluginApply,result.input,result.preview,result.applied,result.refinedPreview,result.refinedApply,result.cleanPreview,result.cleanApply,result.removed,result.autoInput,result.autoPreview,result.autoApplied,result.screenInput,result.screenPreview,result.screenApply].map(item=>item.path);
     await window.webContents.executeJavaScript(`(async()=>{await window.frameLine.clearBackgroundPreview();await window.frameLine.discardProcessedImages(${JSON.stringify(files)});})()`);
     assert(files.every(file=>!fs.existsSync(file)),'generated previews and working files are discarded through ownership checks');
     console.log('Production processing checks passed: installed plugin discovery, controls, preview/Apply equality, batch undo/redo and portable save/open; SVG/AVIF import, transparency, progress, editing/export and portable save/open; binary PNG storage, dedicated previews, real stage progress, identical preview/Apply images, validation and cleanup.');

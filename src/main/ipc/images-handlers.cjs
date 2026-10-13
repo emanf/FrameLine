@@ -3,6 +3,7 @@ const { app, BrowserWindow, dialog, ipcMain } = require('electron');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const fs = require('node:fs/promises');
+const {previewFailure} = require('./preview-failure.cjs');
 
 /** Register images commands against the desktop service container. */
 function registerImagesHandlers(services) {
@@ -90,7 +91,7 @@ function registerImagesHandlers(services) {
       const result = await services.processImage(event, "refine_edges", {...request, output}, true);
       services.generatedEffects.set(output, event.sender.id);
       return result;
-    } catch (error) { await fs.rm(output, {force:true}); throw error; }
+    } catch (error) { await fs.rm(output, {force:true}); return previewFailure(error); }
   });
   
   ipcMain.handle("images:preview-outline", async (event, request) => {
@@ -102,7 +103,7 @@ function registerImagesHandlers(services) {
       return result;
     } catch (error) {
       await fs.rm(output, { force: true }).catch(cleanupError => console.error("Failed to clean up outline preview:", cleanupError));
-      throw error;
+      return previewFailure(error);
     }
   });
   
@@ -113,7 +114,11 @@ function registerImagesHandlers(services) {
         const result = await services.processImage(event, 'clean_pixels', {...request, output}, preview);
         services.generatedEffects.set(output, event.sender.id);
         return result;
-      } catch (error) { await fs.rm(output, {force:true}); throw error; }
+      } catch (error) {
+        await fs.rm(output, {force:true});
+        if (preview) return previewFailure(error);
+        throw error;
+      }
     });
   }
   
@@ -143,7 +148,7 @@ function registerImagesHandlers(services) {
       await fs.rm(output, { force: true }).catch((cleanupError) => {
         console.error("Failed to clean up incomplete background preview:", cleanupError);
       });
-      throw error;
+      return previewFailure(error);
     }
   });
   

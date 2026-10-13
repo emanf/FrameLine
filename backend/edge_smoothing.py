@@ -1,4 +1,4 @@
-"""Straighten pixel stair steps and supersample a cutout's alpha boundary.
+"""Reconstruct cutout coverage and supersample its alpha boundary when requested.
 
 The output remains an RGBA image. Supersampling adds coverage at the boundary,
 not a blur across the subject or a feathered halo around it.
@@ -92,10 +92,11 @@ def _contours(mask, check_cancelled):
     return contours
 
 
-def _simplify_open(points, tolerance):
+def _simplify_open(points, tolerance, check_cancelled=lambda: None):
     keep = {0, len(points) - 1}
     pending = [(0, len(points) - 1)]
     while pending:
+        check_cancelled()
         first, last = pending.pop()
         ax, ay = points[first]
         bx, by = points[last]
@@ -103,6 +104,8 @@ def _simplify_open(points, tolerance):
         length_squared = dx * dx + dy * dy
         farthest, distance_squared = first, tolerance * tolerance
         for index in range(first + 1, last):
+            if index % 8192 == 0:
+                check_cancelled()
             x, y = points[index]
             t = max(0, min(1, ((x - ax) * dx + (y - ay) * dy) / length_squared)) if length_squared else 0
             distance = (x - ax - t * dx) ** 2 + (y - ay - t * dy) ** 2
@@ -119,17 +122,15 @@ def _area(points):
                    for i, (x, y) in enumerate(points))) / 2
 
 
-def _straighten(points, strength):
+def _simplify_contour(points, tolerance, check_cancelled=lambda: None):
+    """Remove bounded geometric deviations without collapsing tiny or narrow contours."""
     # Keep tiny islands and holes, including one-pixel details.
     if _area(points) <= 4:
         return points
     split = max(range(1, len(points)), key=lambda i:
                 (points[i][0] - points[0][0]) ** 2 + (points[i][1] - points[0][1]) ** 2)
-    # Remove at most one source pixel of staircase deviation. Direction changes
-    # and sharp corners remain polygon vertices; there is no corner rounding.
-    tolerance = strength / 100
-    simplified = (_simplify_open(points[:split + 1], tolerance)[:-1]
-                  + _simplify_open(points[split:] + points[:1], tolerance)[:-1])
+    simplified = (_simplify_open(points[:split + 1], tolerance, check_cancelled)[:-1]
+                  + _simplify_open(points[split:] + points[:1], tolerance, check_cancelled)[:-1])
     # Simplification must not collapse a narrow component.
     if len(simplified) >= 3 and _area(simplified) >= _area(points) / 2:
         return simplified
@@ -192,11 +193,33 @@ def _rasterize(contours, size, scale, check_cancelled, origin=(0, 0)):
 
 
 def antialias_silhouette(rgb, alpha, strength, check_cancelled=lambda: None, origin=(0, 0)):
-    from PIL import Image, ImageChops
+    """Supersample a silhouette with the existing subpixel edge-straightening behavior."""
+    return _render_silhouette(rgb, alpha, strength / 100, 4, check_cancelled, origin)
+
+
+def simplify_silhouette(rgb, alpha, tolerance, check_cancelled=lambda: None, progress=lambda *_: None, options=None, antialias=0):
+    """Route curve reconstruction or legacy pixel cleanup with validated displacement limits."""
+    from curve_smoothing import validate_curve_options, smooth_curves
+    settings = validate_curve_options(options) if options is not None else None
+    maximum = 64 if settings and settings['method'] == 'curve' else 8
+    if isinstance(tolerance, bool) or not isinstance(tolerance, (int, float)) or not math.isfinite(tolerance) or not 0 <= tolerance <= maximum:
+        raise ValueError(f'Contour maximum change must be between 0 and {maximum} pixels.')
+    check_cancelled()
+    if not tolerance:
+        return rgb.copy(), alpha.copy()
+    if settings and settings['method'] == 'curve':
+        return smooth_curves(rgb, alpha, tolerance, settings, antialias, check_cancelled, progress)
+    from contour_cleanup import clean_contour
+    return clean_contour(rgb, alpha, tolerance, check_cancelled, progress)
+
+
+def _render_silhouette(rgb, alpha, tolerance, scale, check_cancelled, origin=(0, 0), progress=lambda *_: None):
+    """Cache contour geometry/coverage and extend foreground color into new edge pixels."""
     from processing_cache import CACHE, cached_image, image_key
 
     solid = alpha.point(lambda value: 255 if value else 0)
     check_cancelled()
+    progress(44, 100, 'Tracing cutout contour…')
     key = image_key("silhouette-contours", solid)
     contours = CACHE.get(key)
     if contours is None:
@@ -204,9 +227,21 @@ def antialias_silhouette(rgb, alpha, strength, check_cancelled=lambda: None, ori
         CACHE.put(key, contours, sum(len(points) for points in contours) * 160)
     if not contours:
         return rgb, alpha.copy()
-    coverage = cached_image(image_key("silhouette-coverage", solid, parameters=(strength, origin)),
-                            lambda: _rasterize([_straighten(points, strength) for points in contours],
-                                               alpha.size, 4, check_cancelled, origin))
+    progress(48, 100, 'Simplifying cutout shape…')
+    simplified = []
+    for points in contours:
+        check_cancelled()
+        simplified.append(_simplify_contour(points, tolerance, check_cancelled))
+    progress(52, 100, 'Rasterizing cutout shape…')
+    coverage = cached_image(image_key("silhouette-coverage", solid, parameters=(tolerance, scale, origin)),
+                            lambda: _rasterize(simplified, alpha.size, scale, check_cancelled, origin))
+    return _apply_coverage(rgb, alpha, coverage, check_cancelled)
+
+
+def _apply_coverage(rgb, alpha, coverage, check_cancelled):
+    """Apply cleaned coverage, borrowing foreground RGBA only for newly covered pixels."""
+    from PIL import Image, ImageChops
+    solid = alpha.point(lambda value: 255 if value else 0)
     grown = ImageChops.multiply(coverage.point(lambda value: 255 if value else 0), ImageChops.invert(solid))
     # Anti-aliasing can cover previously keyed pixels along diagonal edges.
     # Extend nearby subject colors and opacity into those pixels, rather than

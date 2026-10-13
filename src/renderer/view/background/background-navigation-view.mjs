@@ -110,7 +110,7 @@ export class BackgroundNavigationView {
     };
     session.updatePreviewTransform();
     session.runtime.backgroundPreviewDrag = null;
-    session.previewFrame.style.cursor = session.ignoreEnabled || session.method.value === "sample" ? "crosshair" : "grab";
+    session.previewFrame.style.cursor = session.ignoreEnabled || session.method.value === "sample" ? "crosshair" : "default";
     if (session.previewFrame.hasPointerCapture(event.pointerId)) session.previewFrame.releasePointerCapture(event.pointerId);
     
   }

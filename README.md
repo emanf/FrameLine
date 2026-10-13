@@ -4,7 +4,7 @@
 
 # FrameLine
 
-Version **1.1.0** · [Release notes](CHANGELOG.md)
+Version **1.1.1** · [Release notes](CHANGELOG.md)
 
 FrameLine turns videos and image sequences into usable animation assets: extract PNG frames, remove backgrounds, clean up edges, and keep only the frames you need.
 
@@ -48,7 +48,7 @@ On Windows, you can also use `run.bat` to check dependencies and launch the app.
 - **Crop, Outline, and Padding:** Enter exact crop coordinates, add inside/center/outside outlines, or add transparent padding with independent or linked sides. Supported edits can apply to one image or the whole batch.
 - **Ignore and Recover brushes:** Paint protected areas that effects leave unchanged, or restore individual areas from the imported original. Both support size, anti-aliasing, round/square shapes, Alt + wheel resizing, and one Undo step per stroke. Ignore marks are saved with the project. The eye button beside Preview Background hides the red overlay while keeping protection active; the overlay stays out of exports. The removal window also has a batch protection brush. Crop keeps protected areas inside its bounds.
 - **Brush and Eraser:** Adjust size and feather; Brush also provides opacity and round or square shapes. Long strokes update incrementally. Disable anti-aliasing with zero feather for crisp pixel art.
-- **Remove Background:** Detect background colors automatically or choose a custom color. Aggressive removal targets enclosed matches; chroma key and sampled-color modes offer more control. Adjust edge smoothing, blur, tint, spill suppression, and edge color cleanup.
+- **Remove Background:** Screen Keying detects a screen color or uses a manual choice, with soft transparency and built-in despill. Adjust key balance, matte levels, and edge-aware clipping; neutral backgrounds use a color-distance fallback. Smooth contour reconstructs flowing outlines with strength, detail size, movement limits, and angle-based corner protection; Pixel cleanup handles local teeth and notches. Anti-aliasing and blur stay separate. Aggressive removal, chroma key, sampled colors, Ignore protection, and a settings reset are also available.
 - **Color Cleanup Brush:** Replace unwanted color mixtures and recover transparency with Keep/Remove colors or local automatic detection. Auto Keep nearby colors preserves hair, highlights, and shadows, with adjustable sampling distance and opacity recovery.
 - **Refine Edges:** Repair white or colored fringes, clean transparency, smooth boundaries, and optionally shrink edges while preserving nearby foreground colors.
 - **Clean Pixels:** Reduce noise and uneven colors across the whole image, including colorful artwork. Preview cleanup strength, color tolerance, radius, and isolated speckle removal, then apply to one image or all images. Transparency stays unchanged.

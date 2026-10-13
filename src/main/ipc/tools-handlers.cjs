@@ -2,6 +2,7 @@ const { app, BrowserWindow, dialog, ipcMain } = require('electron');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const fs = require('node:fs/promises');
+const {previewFailure} = require('./preview-failure.cjs');
 
 /** Register tools commands against the desktop service container. */
 function registerToolsHandlers(services) {
@@ -14,7 +15,11 @@ function registerToolsHandlers(services) {
       const result = await services.processImage(event, 'process_tool_plugin', {...request, processor, output}, Boolean(request.preview));
       services.generatedEffects.set(output, event.sender.id);
       return result;
-    } catch (error) { await fs.rm(output, {force:true}); throw error; }
+    } catch (error) {
+      await fs.rm(output, {force:true});
+      if (request.preview) return previewFailure(error);
+      throw error;
+    }
   });
 }
 module.exports = {registerToolsHandlers};

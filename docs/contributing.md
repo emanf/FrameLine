@@ -34,11 +34,17 @@ npm run test:main
 
 The JavaScript suite covers project rules, brushes, selection, history, storage, discovery, and option schemas. The Python suite covers image algorithms, rendering, archives, exports, cancellation, and plugin processing. The Electron UI suite checks real controls and workflows with deterministic fixture services. The production suite uses real IPC, preload, Python workers, imports, and a temporarily installed example plugin.
 
-The focused timeline UI suite checks cleanup patterns, paged worker previews, edited thumbnails, cancellation, Apply/Undo/Redo, selected Reverse, playback controls, and the Add dialog. It also exercises uninterrupted Brush, Ignore, and Recover strokes on a 1280×960 image, checking stable frame timings and identical held, released, applied, and history pixels.
+The focused timeline UI suite checks cleanup patterns, paged worker previews, edited thumbnails, cancellation, Apply/Undo/Redo, selected Reverse, playback controls, and the Add dialog. It verifies that multi-delete rebases the visible loop handles and saved Start–End values. It also exercises uninterrupted Brush, Ignore, and Recover strokes on a 1280×960 image, checking stable frame timings and identical held, released, applied, and history pixels.
 
 The same suite checks toolbox sections, Clear/Recover placement, the view-only Ignore toggle, About metadata, and contact copying. Version assertions read `package.json` so a release bump does not require changing fixture versions elsewhere. Mask tests cover sparse allocation, appended-segment work, protection, and parity with complete rendering.
 
 When changing processing, verify preview and Apply equality, alpha handling, current edited inputs, undo, cancellation, and portable persistence. When changing project fields or frame behavior, update validation and relevant model tests. Keep tests in version control; only generated caches, coverage, and build artifacts belong in `.gitignore`.
+
+Screen-keying tests compare against checked-in pixels produced by Blender's CPU compositor and check tiled/untiled equality. Standard tests do not require Blender. To regenerate the reference with an installed Blender 5.2+ executable, follow [Background keying](background-keying.md#reference-verification). Inspect reference changes before accepting them; generating new expectations is not a substitute for checking the implementation.
+
+Contour tests check bump/notch removal without feathering, important corners, holes, small islands, source opacity, protection, cancellation, and every removal method. Preview cancellation tests verify that expected cancellations cross IPC quietly while real failures reject. The production Electron suite supersedes a running background preview; the UI suite checks right-drag cursors, factory reset, retained Ignore marks, contour settings, and batch requests.
+
+Curve tests use registered before/after circle regions with their derivation recorded in `tests/fixtures/curve-reference.json`. They check reference improvement, independent strength/detail/movement controls, protected versus rounded triangle points, non-circular proportions, transparency, and Ignore compositing. Keep curve fitting independent of display zoom and avoid adding a shape-specific assumption to satisfy a single reference.
 
 `python scripts/benchmark-effects.py` measures effect timings and output hashes on fixed fixtures. `node scripts/benchmark-brush.mjs` compares complete-path and cached coverage updates for 2,400-point strokes, with and without feather. Compare the same input, dimensions, settings, and environment when making performance claims. Avoid replacing a native Pillow operation with per-pixel Python loops without measurement.
 

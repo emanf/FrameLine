@@ -44,13 +44,27 @@ For pixel art, turn anti-aliasing off and set feather to zero. For smooth bounda
 
 Use Color Cleanup when unwanted colors are mixed into foreground pixels. Set Remove and Keep colors, or use Auto Keep to sample nearby foreground colors while retaining hair shading and highlights. Automatic Remove detection is off by default and samples the clicked brush area using the original background's color family as a reference.
 
-Remove Background opens a separate window with automatic or custom background selection, aggressive removal, chroma key, and sampled-color modes. Optional edge controls handle smoothing, blur, spill, tint, and residual colors. Its Ignore brush protects marked source areas and can apply the removal settings across a batch.
+Remove Background opens a separate window. **Screen Keying** detects screen colors from the image border, or uses a custom color you choose. Colored screens use a soft saturation matte and built-in despill, following Blender's Keying approach. White, black, gray, and nearly neutral backgrounds use connected color-distance removal instead. Chroma key and sampled-color modes are also available. The preview shows an arrow normally; hold the right mouse button and drag to pan.
+
+Expand **Keying controls** to adjust Key Balance, Black/White Levels, Edge Size/Tolerance, and Despill Strength/Balance. Defaults correspond to the Keying node's basic settings: balance 0.5, levels 0/1, edge size 3 px, edge tolerance 0.1, and despill strength 100% with balance 0.5. Leave Tolerance at 128 and optional edge effects off to start. Increase Black Level or enable Aggressive for faint background residue; lower White Level to make partially retained foreground more opaque. Edge Size/Tolerance protect varying edge pixels from level clipping. These are matte controls rather than a blur.
+
+Screen keying also removes enclosed screen-colored areas. Enable **Connected background only** to preserve enclosed matches; Aggressive overrides that restriction. Neutral backgrounds always use connected removal unless Aggressive is enabled, and saturation controls are disabled for them. If artwork itself shares the screen color, use Ignore to protect it; reduce Despill Strength if foreground colors lose too much saturation.
+
+Optional edge controls add smoothing, blur, tint, and residual-color cleanup after keying. The window's Ignore brush preserves marked source pixels, and Apply to All detects each image's background independently when automatic selection is active. Preview and Apply use the same settings. See [Background keying](background-keying.md) for the algorithm and reference tests.
+
+Under **Edge shape**, enable **Smooth contour**. **Curved outline** reconstructs a flowing boundary for circles, organic artwork, and other shapes. Strength blends toward the smoothed outline; Detail size sets the size of irregularities to smooth; Maximum change limits movement from the original boundary. Start with the defaults, then increase Detail size for wider bumps. A strong setting for the supplied noisy-circle example is 100% Strength, 64 px Detail size, and 12 px Maximum change.
+
+**Protect sharp corners** preserves pointed features that remain sharp at two detail scales. The angle control protects corners with interior angles up to its value: 110° keeps triangle tips and right-angle corners, while a lower value or disabling protection lets more points round off. Large Detail size and Maximum change can remove intentional small features; use Ignore to protect specific areas. **Pixel cleanup** keeps the faster local tooth/notch cleanup with an 8 px movement limit. These settings are shared by preview, Apply, Apply to All, and saved presets.
+
+Enable anti-aliasing for smooth pixel coverage along the reconstructed curve; Edge blur instead creates a soft transition. Curve smoothing changes the outline and does not blur image colors. **Reset settings** restores factory removal values and turns optional effects off. Ignore marks, the current zoom/pan, and preview background stay intact.
 
 Refine Edges handles cutout transparency and color fringes. Clean Pixels handles noise and speckles across the image while keeping alpha unchanged. These controls use the current edited image, so earlier crop, paint, or background changes remain part of the next operation.
 
 ## Reduce and arrange the animation
 
 Drag Start and End inside the timeline to set the playback loop. The square loop toggle sits with the playback controls. Frame and duration information is shown in the Frame line panel.
+
+Deleting or cutting clips shifts each loop marker back by the number of removed frames before it. Deleting an imported image does the same for all its timeline clips. If the entire loop is removed, a one-frame range remains at the deletion point; an empty timeline resets the range. Undo restores the clips and their previous loop range.
 
 Use Ctrl to toggle clips and Shift to select a range. Selected clips can move together, share duration changes, or use **Reverse** from their context menu. Reverse changes only selected slots. **Delete frames before** and **Delete frames after** remove timeline clips around the clicked clip while leaving the Import images available.
 

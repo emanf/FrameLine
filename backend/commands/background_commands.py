@@ -46,6 +46,14 @@ class BackgroundCommands:
         spill = request.get('spill', 0 if mode == 'auto' else 50)
         edge_tint = request.get('edge_tint', 100)
         edge_smoothing = request.get('edge_smoothing', 0)
+        contour_smoothing = request.get('contour_smoothing', 0)
+        from curve_smoothing import validate_curve_options
+        contour_options = validate_curve_options(request['contour_options']) if 'contour_options' in request else None
+        maximum_change = 64 if contour_options and contour_options['method'] == 'curve' else 8
+        if (isinstance(contour_smoothing, bool) or not isinstance(contour_smoothing, (int, float))
+                or not math.isfinite(contour_smoothing) or not 0 <= contour_smoothing <= maximum_change):
+            raise ValueError(f'Contour maximum change must be between 0 and {maximum_change} pixels.')
+        curve_active = contour_options is not None and contour_options['method'] == 'curve' and contour_options['strength'] > 0 and contour_smoothing > 0
         fringe_cleanup = validate_cleanup(request.get('fringe_cleanup'))
         recover_edges = fringe_cleanup is not None and fringe_cleanup.get('method') == 'recover' and (fringe_cleanup['strength'] > 0)
         if isinstance(edge_smoothing, bool) or not isinstance(edge_smoothing, (int, float)) or (not math.isfinite(edge_smoothing)) or (not 0 <= edge_smoothing <= 100):
@@ -70,9 +78,11 @@ class BackgroundCommands:
         protected = ignore_mask(request.get('ignore_strokes', []), width, height, context.check_cancelled)
         auto_region = None
         background_colors = None
+        auto_rgb = None
+        auto_algorithm = None
         if mode == 'auto':
-            from auto_background import segment_background
-            auto_alpha, auto_region, background_colors = segment_background(image, request, tolerance, 0 if edge_smoothing else softness, context.check_cancelled, context.report_progress)
+            from auto_background import key_background
+            auto_rgb, auto_alpha, auto_region, background_colors, auto_algorithm = key_background(image, request, tolerance, 0 if edge_smoothing else softness, context.check_cancelled, context.report_progress)
             key_color = background_colors[0]
         elif mode == 'chroma':
             key_color = request.get('key_color')
@@ -89,7 +99,7 @@ class BackgroundCommands:
                 raise ValueError('Select a background color from inside the image before applying removal.')
             else:
                 key_color = list(image.getpixel(tuple(sample))[:3])
-        rgb = image.convert('RGB')
+        rgb = auto_rgb if mode == 'auto' else image.convert('RGB')
         if mode != 'auto':
             context.report_progress(20, 100, 'Finding background pixels…')
         channels = list(rgb.split())
@@ -138,7 +148,20 @@ class BackgroundCommands:
             channels = list(rgb.split())
             softness = 0
         removed_background = alpha.point(lambda value: 255 if value == 0 else 0)
-        if edge_smoothing:
+        if contour_smoothing:
+            from edge_smoothing import simplify_silhouette
+            raw_alpha = recovered_alpha if recovered_alpha is not None else ImageChops.multiply(alpha, original_alpha)
+            rgb, reshaped_alpha = simplify_silhouette(rgb, raw_alpha, contour_smoothing, context.check_cancelled,
+                                                     context.report_progress, options=contour_options, antialias=edge_smoothing)
+            channels = list(rgb.split())
+            # The reshaped matte already includes source opacity. Do not multiply it twice.
+            recovered_alpha = reshaped_alpha
+            alpha = reshaped_alpha
+            removed_background = alpha.point(lambda value: 255 if value == 0 else 0)
+        if edge_smoothing and curve_active:
+            context.report_progress(60, 100, 'Finishing curve anti-aliasing…')
+            alpha = recovered_alpha
+        elif edge_smoothing:
             context.report_progress(60, 100, 'Smoothing cutout edges…')
             from edge_smoothing import antialias_silhouette
             raw_alpha = recovered_alpha if recovered_alpha is not None else ImageChops.multiply(alpha, original_alpha)
@@ -149,6 +172,8 @@ class BackgroundCommands:
             alpha = alpha.filter(ImageFilter.GaussianBlur(radius=softness / 32))
             if region is not None:
                 alpha = Image.composite(alpha, protected_alpha, region)
+            if contour_smoothing:
+                recovered_alpha = alpha
         if not edge_smoothing:
             alpha = recovered_alpha if recovered_alpha is not None else ImageChops.multiply(alpha, original_alpha)
         fringe_reference = rgb
@@ -180,6 +205,8 @@ class BackgroundCommands:
             remaining = ImageChops.invert(repaired_translucent) if repaired_translucent is not None else None
             rgb, _ = clean_color_fringe(rgb, fringe_reference, alpha, key_color, fringe_cleanup, context.check_cancelled, target_mask=remaining)
         context.report_progress(85, 100, 'Finishing background removal…')
+        if mode == 'auto':
+            rgb = Image.composite(rgb, Image.new('RGB', image.size), alpha.point(lambda value: 255 if value else 0))
         result = Image.merge('RGBA', (*rgb.split(), alpha))
         if protected is not None and protected.getbbox():
             result = Image.composite(image, result, protected)
@@ -188,4 +215,4 @@ class BackgroundCommands:
         output = Path(request['output'])
         output.parent.mkdir(parents=True, exist_ok=True)
         result.save(output, format='PNG', compress_level=1)
-        return {'path': str(output.resolve()), 'width': width, 'height': height, 'key_color': key_color, **({'background_colors': background_colors} if background_colors else {})}
+        return {'path': str(output.resolve()), 'width': width, 'height': height, 'key_color': key_color, **({'background_colors': background_colors, 'keying_algorithm': auto_algorithm} if background_colors else {})}

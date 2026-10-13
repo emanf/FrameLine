@@ -1,6 +1,6 @@
 {
   "name": "frameline",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "A frame-based image timeline editor",
   "main": "src/main.cjs",
   "scripts": {

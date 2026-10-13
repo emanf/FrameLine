@@ -2,6 +2,7 @@ import { totalFrames, validateProject } from '../../model/project-model.mjs';
 import { preserveOriginal } from '../../model/image-effects.mjs';
 import {cleanupDefaults,timelineCleanupPlan} from '../../model/timeline-cleanup.mjs';
 import {survivingBefore} from '../../model/frame-intervals.mjs';
+import { timelineDeletionPlan } from '../../model/timeline-deletion.mjs';
 
 const copy = value => JSON.parse(JSON.stringify(value));
 
@@ -287,8 +288,9 @@ export class TimelineCommands {
   deleteSelected() {
     const index = this.viewModel.project.clips.findIndex(clip => this.viewModel.selectedClipIds.has(clip.id));
     if (index < 0) return false;
+    const plan = timelineDeletionPlan(this.viewModel.project, clip => this.viewModel.selectedClipIds.has(clip.id));
     this.viewModel.record();
-    this.viewModel.project.clips = this.viewModel.project.clips.filter(clip => !this.viewModel.selectedClipIds.has(clip.id));
+    Object.assign(this.viewModel.project, plan);
     this.viewModel.selectedClipId = this.viewModel.project.clips[Math.min(index, this.viewModel.project.clips.length - 1)]?.id ?? null;
     this.viewModel.clampCurrentFrame();
     this.viewModel.notify();
@@ -301,17 +303,9 @@ export class TimelineCommands {
     if (index < 0 || !["before", "after"].includes(side)) return false;
     const before = side === "before";
     if (before ? index === 0 : index === this.viewModel.project.clips.length - 1) return false;
-    const removedFrames = before
-      ? this.viewModel.project.clips.slice(0, index).reduce((sum, clip) => sum + clip.durationFrames, 0)
-      : 0;
+    const plan = timelineDeletionPlan(this.viewModel.project, (_clip, clipIndex) => before ? clipIndex < index : clipIndex > index);
     this.viewModel.record();
-    this.viewModel.project.clips = before ? this.viewModel.project.clips.slice(index) : this.viewModel.project.clips.slice(0, index + 1);
-    if (before) {
-      // Keep the playhead and loop attached to the surviving frame positions.
-      this.viewModel.project.currentFrame = Math.max(0, this.viewModel.project.currentFrame - removedFrames);
-      this.viewModel.project.loopStartFrame = Math.max(0, this.viewModel.project.loopStartFrame - removedFrames);
-      if (this.viewModel.project.loopEndFrame != null) this.viewModel.project.loopEndFrame = Math.max(0, this.viewModel.project.loopEndFrame - removedFrames);
-    }
+    Object.assign(this.viewModel.project, plan);
     this.viewModel.selectedClipId = clipId;
     this.viewModel.previewImageId = null;
     this.viewModel.clampCurrentFrame();

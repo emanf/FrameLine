@@ -1,0 +1,7 @@
+{
+  "description": "Binary circle regions derived from user-supplied before/after examples, excluding labels.",
+  "before": {"source": "before.png", "crop": [50, 180, 650, 700]},
+  "after": {"source": "after.png", "crop": [10, 180, 610, 700]},
+  "threshold": "8-bit grayscale less than 128 becomes opaque, other pixels become transparent",
+  "size": [600, 520]
+}

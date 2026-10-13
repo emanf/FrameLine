@@ -7,7 +7,7 @@ from PIL import Image, ImageDraw
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'backend'))
 import engine
-from auto_background import connected_border
+from auto_background import connected_border, detect_colors
 
 
 class AutoBackgroundTests(unittest.TestCase):
@@ -28,26 +28,43 @@ class AutoBackgroundTests(unittest.TestCase):
         draw.rectangle((20, 10, 23, 13), fill=(*background, 255))
         return image
 
-    def test_auto_detects_any_background_and_preserves_colorful_subject_and_interior(self):
-        for color in ((20,230,40), (255,255,255), (0,0,0), (80,20,190), (235,120,40)):
-            with self.subTest(color=color):
-                source = self.character(color)
-                result, metadata = self.run_removal(source)
-                self.assertEqual(metadata['key_color'], list(color))
-                self.assertEqual(result.getpixel((0,0))[3], 0)
-                for point in ((11,6), (18,18), (21,11)):
-                    self.assertEqual(result.getpixel(point), source.getpixel(point))
+    def test_detected_screen_key_removes_enclosed_background_and_keeps_other_foreground_colors(self):
+        source=self.character()
+        result,metadata=self.run_removal(source)
+        self.assertEqual(metadata['key_color'],[20,230,40])
+        self.assertEqual(metadata['keying_algorithm'],'screen-keying')
+        for point in [(0,0),(21,11)]:self.assertEqual(result.getpixel(point)[3],0)
+        for point in [(11,6),(18,18)]:self.assertEqual(result.getpixel(point),source.getpixel(point))
 
-    def test_aggressive_removes_enclosed_matches_and_wider_shades(self):
-        source = self.character()
-        source.putpixel((1,1), (65,230,40,255))
-        normal, _ = self.run_removal(source)
-        aggressive, _ = self.run_removal(source, aggressive=True, aggressive_amount=50)
-        self.assertEqual(normal.getpixel((21,11))[3], 255)
-        self.assertEqual(aggressive.getpixel((21,11))[3], 0)
-        self.assertEqual(normal.getpixel((1,1))[3], 255)
-        self.assertEqual(aggressive.getpixel((1,1))[3], 0)
-        self.assertEqual(aggressive.getpixel((11,6)), source.getpixel((11,6)))
+    def test_neutral_background_fallback_preserves_enclosed_colors(self):
+        for color in [(255,255,255),(0,0,0),(220,210,190)]:
+            with self.subTest(color=color):
+                source=self.character(color)
+                result,metadata=self.run_removal(source)
+                self.assertEqual(metadata['key_color'],list(color))
+                self.assertEqual(metadata['keying_algorithm'],'neutral-distance')
+                self.assertEqual(result.getpixel((0,0))[3],0)
+                for point in [(11,6),(18,18),(21,11)]:self.assertEqual(result.getpixel(point),source.getpixel(point))
+
+    def test_colored_screens_support_red_blue_and_custom_backgrounds(self):
+        for color in [(235,120,40),(40,70,240)]:
+            with self.subTest(color=color):
+                source=self.character(color)
+                source.putpixel((18,18),(80,80,80,255))
+                result,metadata=self.run_removal(source,background_source='custom',key_color=list(color))
+                self.assertEqual(result.getpixel((0,0))[3],0)
+                self.assertEqual(result.getpixel((18,18)),(80,80,80,255))
+                self.assertEqual(metadata['keying_algorithm'],'screen-keying')
+
+    def test_connected_option_protects_enclosed_matches_and_aggressive_removes_residue(self):
+        source=self.character();source.putpixel((1,1),(65,230,40,255))
+        normal,_=self.run_removal(source,keying={'connected_only':True})
+        aggressive,_=self.run_removal(source,aggressive=True,aggressive_amount=50,keying={'connected_only':True})
+        self.assertEqual(normal.getpixel((21,11)),source.getpixel((21,11)))
+        self.assertEqual(aggressive.getpixel((21,11))[3],0)
+        self.assertGreater(normal.getpixel((1,1))[3],0)
+        self.assertEqual(aggressive.getpixel((1,1))[3],0)
+        self.assertEqual(aggressive.getpixel((11,6)),source.getpixel((11,6)))
 
     def test_subject_touching_opposite_borders_is_not_a_second_background_color(self):
         source = Image.new('RGBA', (40,30), (20,230,40,255))
@@ -57,6 +74,29 @@ class AutoBackgroundTests(unittest.TestCase):
         self.assertEqual(result.getpixel((15,0)), source.getpixel((15,0)))
         self.assertEqual(result.getpixel((1,15))[3],0)
         self.assertEqual(result.getpixel((38,15))[3],0)
+
+    def test_border_estimate_uses_an_observed_screen_shade_without_following_rare_outliers(self):
+        source = Image.new('RGBA', (50, 40), (0, 235, 0, 255))
+        for x in range(source.width):
+            for y in (0, source.height-1):
+                source.putpixel((x, y), (0, 232+x%5, 0, 255))
+        for y in range(source.height):
+            for x in (0, source.width-1):
+                source.putpixel((x, y), (0, 232+y%5, 0, 255))
+        source.putpixel((0, 0), (0, 220, 0, 255))
+        color = detect_colors(source, lambda: None)[0]
+        self.assertEqual((color[0], color[2]), (0, 0))
+        self.assertGreaterEqual(color[1], 232)
+        self.assertLessEqual(color[1], 233)
+
+    def test_progress_does_not_move_backward_when_tracing_after_soft_keying(self):
+        source = Image.new('RGBA', (64, 320), (0, 255, 0, 255))
+        ImageDraw.Draw(source).rectangle((20, 40, 43, 280), fill=(80, 30, 180, 255))
+        events = []
+        with patch.object(engine, 'report_progress', side_effect=lambda *event: events.append(event)):
+            self.run_removal(source, keying={'connected_only': True})
+        self.assertTrue(any('Tracing' in event[2] for event in events))
+        self.assertEqual([event[0] for event in events], sorted(event[0] for event in events))
 
     def test_multiple_border_shades_and_each_batch_image_detects_own_color(self):
         source = self.character()

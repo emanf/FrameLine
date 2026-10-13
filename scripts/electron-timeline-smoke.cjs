@@ -169,6 +169,30 @@ app.whenReady().then(async()=>{
     assert.deepEqual(saved.clips.slice(0,5).map(clip=>clip.id),['clip-4','clip-1','clip-2','clip-3','clip-0']);
     await click('#undo'); await save();
     assert.deepEqual(saved.clips.slice(0,5).map(clip=>clip.id),['clip-0','clip-1','clip-2','clip-3','clip-4']);
+    // Loop handles follow the surviving content after a nonadjacent multi-delete.
+    source = {...source, loopStartFrame:6, loopEndFrame:18};
+    await click('#open-project');
+    await until(()=>evaluate(`document.querySelector('#loop-start').getAttribute('aria-valuenow') === '7'`),'loop fixture opens');
+    await evaluate(`(() => {
+      for(const [index,id] of ['clip-0','clip-2','clip-10'].entries())
+        document.querySelector('#clips [data-clip-id="'+id+'"]').dispatchEvent(new MouseEvent('click',{bubbles:true,ctrlKey:index>0}));
+      document.querySelector('#clips [data-clip-id="clip-2"]').dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,clientX:350,clientY:650}));
+    })()`);
+    await click('.context-menu [aria-label="Delete"]');
+    await until(()=>evaluate(`document.querySelector('#message-dialog').open`),'multi-delete confirmation');
+    await click('#message-actions [data-action="confirm"]');
+    await until(()=>evaluate(`document.querySelector('#stats-frames').textContent === '18'`),'multi-delete applies');
+    const loopHandles = () => evaluate(`['loop-start','loop-end'].map(id=>document.getElementById(id).getAttribute('aria-valuenow'))`);
+    assert.deepEqual(await loopHandles(),['5','15']);
+    assert.equal(await evaluate(`document.querySelector('#loop-range-band').style.left`),'16px');
+    assert.equal(await evaluate(`document.querySelector('#loop-range-band').style.width`),'44px');
+    await save();
+    assert.equal(saved.loopStartFrame,4);
+    assert.equal(saved.loopEndFrame,15);
+    await click('#undo');
+    assert.deepEqual(await loopHandles(),['7','18']);
+    await click('#redo');
+    assert.deepEqual(await loopHandles(),['5','15']);
     // Open a long held clip and exercise the module worker and bounded preview pages.
     source = {...createProject(),name:'Held frame checks',images:[images[0]],clips:[{id:'held',imageId:images[0].id,durationFrames:50000}]};
     await click('#open-project'); await until(()=>evaluate(`document.querySelector('#stats-frames').textContent === '50000'`),'held fixture');
@@ -359,7 +383,7 @@ app.whenReady().then(async()=>{
     await until(()=>workingPaths.size === retainedWorking,'temporary thumbnail released');
     assert.equal(source.images[0].path,images[0].path);
     assert.deepEqual(errors,[]);
-    console.log('Timeline UI checks passed: pattern preview, cancellation, exceptions, worker paging, Apply/Undo/Redo, selected Reverse, square Loop, timing controls, Add action order, About metadata, initial height, square brush cursor alignment, About clipboard, Ignore/Recover gestures and Undo/Redo');
+    console.log('Timeline UI checks passed: pattern preview, cancellation, exceptions, worker paging, Apply/Undo/Redo, selected Reverse, deletion rebases visible loop handles, square Loop, timing controls, Add action order, About metadata, initial height, square brush cursor alignment, About clipboard, Ignore/Recover gestures and Undo/Redo');
     window.destroy(); app.quit();
   } catch(error) {
     console.error(error); console.error(errors);

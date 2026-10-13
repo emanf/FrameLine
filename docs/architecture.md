@@ -39,9 +39,11 @@ flowchart LR
 
 Application controllers call bound commands through the composition context. A controller should perform one workflow: imports, exports, playback, keyboard handling, crop input, or another focused operation. Model and view-model code must not query the DOM. `TimelineView` composes virtual image-list/track views, a bounded image cache, preview presentation, and property/status views under `view/components/`.
 
-The background-removal modal creates a session shared by four components: settings validation, preview scheduling, navigation/display, and the protected-area brush. Its dialog coordinator owns attachment and cleanup of event handlers.
+The background-removal modal creates a session shared by settings validation, preview scheduling, navigation/display, keying and contour controls, and the protected-area brush. `BackgroundKeyingView` owns numeric labels, valid level intervals, preset restoration, and the neutral-fallback hint. Its dialog coordinator owns attachment and cleanup of event handlers.
 
 Frame cleanup follows the same split: `timeline-cleanup.mjs` calculates retained intervals without changing the project; `TimelineCleanupViewModel` owns draft options and paged results; `TimelineCleanupDialog` renders controls and thumbnails. Large plans run in a module worker, and preview pages contain at most 48 items. Edited thumbnails use the current-image service with two concurrent requests and release temporary files when the page or dialog closes. The controller submits the reviewed plan through a revision-checked timeline command as one undo step.
+
+`timeline-deletion.mjs` plans clip removal and rebases playback positions using surviving frame intervals. Timeline Delete/Cut, deletion before or after a clip, and Import asset deletion share this model function. Each boundary subtracts only removed frames before it; automatic End remains automatic. Commands record the previous state once, apply the plan, and notify the views so loop handles and saved range values stay synchronized.
 
 ## Tool architecture
 
@@ -72,6 +74,8 @@ The Python bridge uses JSON-lines requests with correlated operation IDs. Commit
 A processed-image preview is temporary. It is decoded into a canvas and released after use. Apply processes the same options, checks the expected revision, and commits only if the source is still valid. Stale outputs are discarded through a main-process ownership map. User-visible progress runs throughout batch processing and export tasks.
 
 Python commands are grouped under `backend/commands/`: background operations, image-output commands, raster rendering, GIF encoding, video operations, and image/contact-sheet exports. `backend/engine.py` owns the transport, progress/cancellation context, command dispatch, and a compatibility facade. Command groups resolve shared callbacks through that context, keeping caches and cancellation consistent.
+
+Screen Keying separates border palette detection and neutral/connected fallback in `auto_background.py` from scene-linear saturation keying in `screen_keying.py`. The latter uses tiled native Pillow channel operations, neighborhood halos for edge-aware clipping, and a cached encoding lookup. The command multiplies the matte by source alpha, applies optional curve reconstruction in `curve_smoothing.py` or local pixel cleanup in `contour_cleanup.py`, applies edge effects, restores protection, and writes the working PNG. `CurveSmoother` owns robust local fits and angle-based arc boundaries; fitted targets are cached separately from strength and rendering. `BackgroundContourView` owns method/strength/detail/corner controls and presets; `BackgroundSettingsView` resets processing controls independently of Ignore strokes and inspection state. Result metadata identifies `screen-keying` or `neutral-distance`; both preview and Apply use this path. [Background keying](background-keying.md) documents equations, color-space assumptions, and optional Blender verification. Blender is not an application dependency.
 
 ## Persistence
 

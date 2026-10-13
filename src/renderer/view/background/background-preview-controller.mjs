@@ -67,12 +67,14 @@ export class BackgroundPreviewController {
             session.errorElement.hidden = true;
             if (options.mode === 'auto' && result.background_colors) {
               session.detectedColors.textContent = `${options.background_source === 'auto' ? 'Detected' : 'Custom'}: ${result.background_colors.map(color => '#' + color.map(channel => channel.toString(16).padStart(2, '0')).join('')).join(', ')}`;
+              session.keyingView.setAlgorithm(result.keying_algorithm);
+              if(result.keying_algorithm) session.detectedColors.textContent+=result.keying_algorithm==='screen-keying' ? ' · Soft screen keying' : ' · Neutral background';
             }
             session.setPreviewStatus('ready');
           }
         })
         .catch((error) => {
-          if (requestId === session.runtime.backgroundPreviewRequestId && session.dialog.open) {
+          if (requestId === session.runtime.backgroundPreviewRequestId && session.dialog.open && error.code !== 'PREVIEW_SUPERSEDED') {
             session.errorElement.textContent = error instanceof Error ? error.message : String(error);
             session.errorElement.hidden = false;
             session.setPreviewStatus('error');

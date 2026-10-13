@@ -1,6 +1,7 @@
 
 import { preserveOriginal } from '../../model/image-effects.mjs';
 import { imageRenamePlan } from '../../model/image-names.mjs';
+import { timelineDeletionPlan } from '../../model/timeline-deletion.mjs';
 
 const copy = value => JSON.parse(JSON.stringify(value));
 
@@ -231,7 +232,7 @@ export class ImageListCommands {
     return this.viewModel.removeImages([imageId]);
   }
 
-  /** Remove requested source assets and referenced clips, then clamp playback and selection. */
+  /** Remove source assets and referenced clips, rebasing playback boundaries and selection. */
   removeImages(imageIds = [...this.viewModel.selectedImageIds]) {
     const ids = new Set(imageIds);
     const imageIndex = this.viewModel.project.images.findIndex(image => ids.has(image.id));
@@ -239,9 +240,10 @@ export class ImageListCommands {
     const removedClipIndexes = this.viewModel.project.clips
       .map((clip, index) => ids.has(clip.imageId) ? index : -1)
       .filter((index) => index >= 0);
+    const plan = timelineDeletionPlan(this.viewModel.project, clip => ids.has(clip.imageId));
     this.viewModel.record();
     this.viewModel.project.images = this.viewModel.project.images.filter(image => !ids.has(image.id));
-    this.viewModel.project.clips = this.viewModel.project.clips.filter(clip => !ids.has(clip.imageId));
+    if (plan) Object.assign(this.viewModel.project, plan);
     if (!this.viewModel.project.clips.some((clip) => clip.id === this.viewModel.selectedClipId)) {
       const nextIndex = removedClipIndexes.length
         ? Math.min(removedClipIndexes[0], this.viewModel.project.clips.length - 1)

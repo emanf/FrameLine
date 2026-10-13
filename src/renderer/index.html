@@ -583,7 +583,7 @@
           <legend>Background</legend>
           <label class="field-label" for="background-method">Removal method</label>
           <select id="background-method">
-            <option value="auto">Auto Background</option>
+            <option value="auto">Screen Keying</option>
             <option value="chroma">Chroma key</option>
             <option value="sample">Sample a color from the image</option>
           </select>
@@ -599,7 +599,28 @@
               <label class="field-label" for="background-aggressive-amount">Aggressive strength <strong id="background-aggressive-value">50%</strong></label>
               <input id="background-aggressive-amount" type="range" min="0" max="100" value="50">
             </div>
-            <p class="background-edge-hint">Detects colors along the image border and removes connected background. Aggressive also removes enclosed matching colors and widens the color range.</p>
+            <p class="background-edge-hint">Detects the screen color, builds a soft matte, and suppresses color spill. Aggressive removes faint screen-colored residue. Neutral backgrounds use color-distance removal.</p>
+            <label class="background-checkbox"><input id="background-keying-connected" type="checkbox"> Connected background only</label>
+            <details class="background-details">
+              <summary>Keying controls</summary>
+              <p id="background-keying-neutral-hint" class="background-edge-hint" hidden>Neutral colors have no screen saturation. Connected color-distance removal protects enclosed details; Aggressive includes enclosed matches.</p>
+              <label class="field-label" for="background-keying-screen-balance">Key balance <strong id="background-keying-screen-balance-value">0.500</strong></label>
+              <input id="background-keying-screen-balance" type="range" min="0" max="1" step="0.01" value="0.5">
+              <label class="field-label" for="background-keying-black-level">Black level <strong id="background-keying-black-level-value">0.000</strong></label>
+              <input id="background-keying-black-level" type="range" min="0" max="0.99" step="0.01" value="0">
+              <label class="field-label" for="background-keying-white-level">White level <strong id="background-keying-white-level-value">1.000</strong></label>
+              <input id="background-keying-white-level" type="range" min="0.01" max="1" step="0.01" value="1">
+              <p class="background-edge-hint">Black makes stable background fully transparent; White makes stable foreground fully opaque. Detailed edges keep their soft matte.</p>
+              <label class="field-label" for="background-keying-edge-size">Edge search size <strong id="background-keying-edge-size-value">3 px</strong></label>
+              <input id="background-keying-edge-size" type="range" min="0" max="8" step="1" value="3">
+              <label class="field-label" for="background-keying-edge-tolerance">Edge tolerance <strong id="background-keying-edge-tolerance-value">0.100</strong></label>
+              <input id="background-keying-edge-tolerance" type="range" min="0" max="1" step="0.01" value="0.1">
+              <label class="field-label" for="background-keying-despill-strength">Despill strength <strong id="background-keying-despill-strength-value">100%</strong></label>
+              <input id="background-keying-despill-strength" type="range" min="0" max="1" step="0.01" value="1">
+              <label class="field-label" for="background-keying-despill-balance">Despill balance <strong id="background-keying-despill-balance-value">0.500</strong></label>
+              <input id="background-keying-despill-balance" type="range" min="0" max="1" step="0.01" value="0.5">
+              <p class="background-edge-hint">Lower Despill if the subject intentionally contains the screen color. Use Ignore to protect those areas.</p>
+            </details>
           </div>
           <div id="background-key-color-field">
             <label class="field-label" for="background-key-color">Key color</label>
@@ -612,6 +633,27 @@
           </fieldset>
           <fieldset class="background-section">
             <legend>Edge shape</legend>
+            <label class="background-checkbox"><input id="background-contour-enabled" type="checkbox"> Smooth contour</label>
+            <div id="background-contour-settings" hidden>
+              <label class="field-label" for="background-contour-method">Smoothing method</label>
+              <select id="background-contour-method" disabled><option value="curve">Curved outline</option><option value="pixel">Pixel cleanup</option></select>
+              <div id="background-contour-curve-settings">
+                <label class="field-label" for="background-contour-strength">Strength <strong id="background-contour-strength-value">100%</strong></label>
+                <input id="background-contour-strength" type="range" min="0" max="100" step="1" value="100" disabled>
+                <label class="field-label" for="background-contour-radius">Detail size <strong id="background-contour-radius-value">32 px</strong></label>
+                <input id="background-contour-radius" type="range" min="1" max="128" step="1" value="32" disabled>
+                <p class="background-edge-hint">Higher detail size smooths wider bumps into a flowing curve. Strength controls how far it follows that curve.</p>
+                <label class="background-checkbox"><input id="background-contour-preserve-corners" type="checkbox" checked disabled> Protect sharp corners</label>
+                <div id="background-contour-corner-settings">
+                  <label class="field-label" for="background-contour-corner-angle">Protect angles up to <strong id="background-contour-corner-angle-value">110°</strong></label>
+                  <input id="background-contour-corner-angle" type="range" min="10" max="160" step="1" value="110" disabled>
+                  <p class="background-edge-hint">Higher angles protect more corners. Lower it or turn protection off to round intentional points too.</p>
+                </div>
+              </div>
+              <label class="field-label" for="background-contour-tolerance">Maximum change <strong id="background-contour-tolerance-value">8 px</strong></label>
+              <input id="background-contour-tolerance" type="range" min="0.25" max="64" step="0.25" value="8" disabled>
+              <p class="background-edge-hint">Limits boundary movement from the original outline. Pixel cleanup keeps the faster local tooth/notch removal. Anti-aliasing stays separate from shape smoothing.</p>
+            </div>
             <label class="background-checkbox"><input id="background-edge-smoothing-enabled" type="checkbox"> Anti-alias cutout edges</label>
             <div id="background-edge-smoothing-settings" hidden>
               <label class="field-label" for="background-edge-smoothing-amount">Edge smoothing <strong id="background-edge-smoothing-amount-value">75%</strong></label>
@@ -696,6 +738,7 @@
         <div id="background-error" class="modal-error" role="alert" hidden></div>
         <div class="modal-actions">
           <label class="background-checkbox"><input id="background-set-default" type="checkbox"> Save as defaults</label>
+          <button id="background-reset-settings" class="secondary-button" type="button"><span class="material-icon" aria-hidden="true">restart_alt</span> Reset settings</button>
           <button id="background-cancel" class="secondary-button" type="button">Cancel</button>
           <button id="background-apply-all" class="secondary-button" type="button">Apply to all images</button>
           <button id="background-apply" class="primary-button" type="submit"><span class="material-icon" aria-hidden="true">auto_fix_high</span> Apply</button>

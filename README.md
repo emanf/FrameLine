@@ -104,6 +104,8 @@ For editing steps and the current toolbox layout, see the [User guide](docs/user
 Developer guides: [Architecture](docs/architecture.md), [Plugin development](docs/plugin-development.md), [Tool API](docs/tool-api.md), and [Contributing](docs/contributing.md). A complete [Invert Colors extension](docs/examples/invert-colors) demonstrates the installation and processing contract.
 
 
-## Author
+---
 
-Created by [eManF](http://emanf.ir). Contact [emanf.cco@gmail.com](mailto:emanf.cco@gmail.com).
+### Acknowledgements
+
+This project was made with the help of AI. ❤️
